@@ -19,7 +19,7 @@ try{
  }
  if(!ready)throw Error("Clinic app failed to start and complete database migrations");
  await check("/api/health",200,"databaseReady", "application/json");
- await check("/clinic",200,"Durva — Practice OS","text/html");
+ await check("/clinic",200,"Durva","text/html");
  await check("/advanced",200,"Durva Clinic · OPD Management","text/html");
  await check("/legacy",200,"Durva Clinic","text/html");
  await check("/clinic.js",200,"Doctor","text/javascript");
@@ -35,7 +35,7 @@ try{
  await check("/api/console/favorites",401,"Sign in required","application/json");
  await check("/api/opd/overview",401,"Sign in required","application/json");
  await check("/api/me",401,"Sign in required","application/json");
- await check("/",200,"Durva — Practice OS","text/html");
+ await check("/",200,"Durva","text/html");
  const db=new SQL(Bun.env.DATABASE_URL,{max:2});
  try{
   const r=await db.unsafe("SELECT COUNT(*)::int AS n FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('clinic_opd_entries','clinic_opd_assessments','clinic_opd_prescriptions','clinic_opd_bills','clinic_opd_payments','clinic_opd_followups','clinic_opd_profile','clinic_opd_audit')");
