@@ -37,15 +37,15 @@ const AUDIO_TYPES={"audio/mp4":"mp4","audio/m4a":"m4a","audio/x-m4a":"m4a","audi
 async function aiRequest(path,options){const result=await fetch("https://api.openai.com/v1"+path,{...options,signal:AbortSignal.timeout(180000)});if(!result.ok)throw Error("AI provider failed with status "+result.status);return result.json();}
 async function handle(req){const url=new URL(req.url),path=url.pathname,method=req.method;
 if(path==="/api/health")return reply({status:dbReady?"ok":"initializing",databaseReady:dbReady,issue:dbError? "Database startup failed":null},dbReady?200:503);
-if(method==="GET"&&["/ui-preview","/ui.js","/ui.css","/ui-views.js","/ui-consult.js"].includes(path)){
- const files={"/ui-preview":"unified.html","/ui.js":"unified.js","/ui.css":"unified.css","/ui-views.js":"unified-views.js","/ui-consult.js":"unified-consult.js"};
+if(method==="GET"&&["/","/clinic","/clinic/","/ui-preview","/ui.js","/ui.css","/ui-views.js","/ui-consult.js"].includes(path)){
+ const files={"/":"unified.html","/clinic":"unified.html","/clinic/":"unified.html","/ui-preview":"unified.html","/ui.js":"unified.js","/ui.css":"unified.css","/ui-views.js":"unified-views.js","/ui-consult.js":"unified-consult.js"};
  const file=files[path],mime=file.endsWith(".html")?"text/html":file.endsWith(".js")?"text/javascript":"text/css";
  return new Response(Bun.file(new URL("./"+file,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 }
-if(path==="/"&&method==="GET")return new Response(FRONTEND,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'"}});
+if(path==="/legacy"&&method==="GET")return new Response(FRONTEND,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'"}});
 if(path==="/app.js"&&method==="GET")return new Response(CLIENT,{headers:{"Content-Type":"text/javascript; charset=utf-8","Cache-Control":"no-cache"}});
-if(method==="GET"&&(path==="/clinic"||path==="/clinic/"||path==="/clinic.js"||path==="/clinic.css")){
- const resource=path==="/clinic"||path==="/clinic/"?"clinic.html":path==="/clinic.js"?"clinic-browser.js":"clinic.css";
+if(method==="GET"&&(path==="/advanced"||path==="/clinic.js"||path==="/clinic.css")){
+ const resource=path==="/advanced"?"clinic.html":path==="/clinic.js"?"clinic-browser.js":"clinic.css";
  const mime=resource.endsWith(".html")?"text/html":resource.endsWith(".js")?"text/javascript":"text/css";
  return new Response(Bun.file(new URL("./"+resource,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 }
