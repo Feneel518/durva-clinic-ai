@@ -23,8 +23,7 @@ function safeRender(){const el=$("app");if(!S.user){el.innerHTML=U.login();retur
  const r={today:U.today,patients:U.search,queue:U.queue,followups:U.followups,more:U.more,reports:U.reports};
  el.innerHTML=(r[S.page]||r.today)(S);
 }
-async function reloadOverview(){S.overview=(await api("/api/opd/overview?date="+encodeURIComponent(S.day))).entries!==undefined?null:null;
- const data=await api("/api/opd/overview?date="+encodeURIComponent(S.day));S.overview=data;}
+async function reloadOverview(){S.overview=await api("/api/opd/overview?date="+encodeURIComponent(S.day));}
 async function loadPatients(){S.patients=(await api("/api/opd/patients?q="+encodeURIComponent(S.search))).patients;}
 async function loadFollowups(){S.followups=(await api("/api/opd/followups")).followups;}
 async function loadFavorites(){S.favorites=(await api("/api/opd/favorites")).favorites;}
