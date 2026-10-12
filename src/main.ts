@@ -39,8 +39,8 @@ const AUDIO_TYPES={"audio/mp4":"mp4","audio/m4a":"m4a","audio/x-m4a":"m4a","audi
 async function aiRequest(path,options){const result=await fetch("https://api.openai.com/v1"+path,{...options,signal:AbortSignal.timeout(180000)});if(!result.ok)throw Error("AI provider failed with status "+result.status);return result.json();}
 async function handle(req){const url=new URL(req.url),path=url.pathname,method=req.method;
 if(path==="/api/health")return reply({status:dbReady?"ok":"initializing",databaseReady:dbReady,issue:dbError? "Database startup failed":null},dbReady?200:503);
-if(method==="GET"&&["/console","/console/","/console.css","/console.js"].includes(path)){
- const file=path.endsWith(".css")?"console.css":path.endsWith(".js")?"console.js":"console.html";
+if(method==="GET"&&["/console","/console/","/console.css","/console-polish.css","/console.js"].includes(path)){
+ const file=path.endsWith("polish.css")?"console-polish.css":path.endsWith(".css")?"console.css":path.endsWith(".js")?"console.js":"console.html";
  const mime=file.endsWith(".css")?"text/css":file.endsWith(".js")?"text/javascript":"text/html";
  return new Response(Bun.file(new URL("./"+file,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'"}});
 }
