@@ -29,6 +29,10 @@ try{
  await check("/ui-views.js",200,"Patient directory","text/javascript");
  await check("/ui-consult.js",200,"Single-screen clinician","text/javascript");
  await check("/ui.css",200,".app-layout","text/css");
+ await check("/console",200,"Your everyday practice","text/html");
+ await check("/console.js",200,"finishVisit","text/javascript");
+ await check("/console.css",200,".hero-main","text/css");
+ await check("/api/console/favorites",401,"Sign in required","application/json");
  await check("/api/opd/overview",401,"Sign in required","application/json");
  await check("/api/me",401,"Sign in required","application/json");
  await check("/",200,"Durva — Practice OS","text/html");
@@ -37,6 +41,9 @@ try{
   const r=await db.unsafe("SELECT COUNT(*)::int AS n FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('clinic_opd_entries','clinic_opd_assessments','clinic_opd_prescriptions','clinic_opd_bills','clinic_opd_payments','clinic_opd_followups','clinic_opd_profile','clinic_opd_audit')");
   if(Number(r[0]?.n)!==8)throw Error("OPD database migrations incomplete");
   console.log("OPD schema OK: all eight tables present");
+  const fav=await db.unsafe("SELECT COUNT(*)::int AS n FROM information_schema.tables WHERE table_schema=\'public\' AND table_name=\'clinic_console_preferences\'");
+  if(Number(fav[0]?.n)!==1)throw Error("Console favorites schema incomplete");
+  console.log("Console doctor preferences table verified.");
  }finally{await db.close();}
  console.log("Clinic production smoke tests completed without patient-data access.");
 }finally{
