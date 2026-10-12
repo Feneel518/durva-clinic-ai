@@ -1,0 +1,10 @@
+{
+  "name": "durva-clinic-ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/main.ts"
+  },
+  "description": "Durva Clinic multilingual AI consultation notes backed by Railway Postgres and Sarvam"
+}
