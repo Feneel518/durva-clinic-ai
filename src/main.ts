@@ -2,6 +2,7 @@ import { SQL } from "bun";
 import { startBatch, checkBatch, structure } from "./sarvam";
 import { extractVoicePatient } from "./patient-registration";
 import { ensureClinicSchema,clinicAPI } from "./clinic-system";
+import { ensureConsoleSchema,consoleApi } from "./console-api";
 import { randomBytes, createHash, createHmac, createCipheriv, createDecipheriv, timingSafeEqual, randomUUID } from "node:crypto";
 const env=Bun.env;
 if(!env.DATABASE_URL||!env.APP_ENCRYPTION_KEY)throw Error("Database and encryption key required");
@@ -15,6 +16,7 @@ const users=await sql.unsafe("SELECT COUNT(*)::int AS n FROM clinic_users");
 if(users[0].n===0){if(!env.BOOTSTRAP_PASSWORD||env.BOOTSTRAP_PASSWORD.length<12)throw Error("Bootstrap credentials missing");await sql.unsafe("INSERT INTO clinic_users(id,email,password_hash) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",[randomUUID(),(env.BOOTSTRAP_EMAIL||"doctor@durvaclinic.local").toLowerCase(),await Bun.password.hash(env.BOOTSTRAP_PASSWORD,{algorithm:"argon2id"})]);}
 await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_ai_jobs(visit_id uuid PRIMARY KEY REFERENCES clinic_visits(id),job_id text NOT NULL,created_at timestamptz NOT NULL DEFAULT now())");
 await ensureClinicSchema(sql);
+await ensureConsoleSchema(sql);
 dbReady=true;
 }catch(e){dbError=String(e?.message||e);console.error("Database setup failed",dbError);}})();
 const names=["chiefComplaint","historyOfPresentIllness","pastHistory","examination","assessment","plan","medications","followUp","uncertainties"];
@@ -37,6 +39,11 @@ const AUDIO_TYPES={"audio/mp4":"mp4","audio/m4a":"m4a","audio/x-m4a":"m4a","audi
 async function aiRequest(path,options){const result=await fetch("https://api.openai.com/v1"+path,{...options,signal:AbortSignal.timeout(180000)});if(!result.ok)throw Error("AI provider failed with status "+result.status);return result.json();}
 async function handle(req){const url=new URL(req.url),path=url.pathname,method=req.method;
 if(path==="/api/health")return reply({status:dbReady?"ok":"initializing",databaseReady:dbReady,issue:dbError? "Database startup failed":null},dbReady?200:503);
+if(method==="GET"&&["/console","/console/","/console.css","/console.js"].includes(path)){
+ const file=path.endsWith(".css")?"console.css":path.endsWith(".js")?"console.js":"console.html";
+ const mime=file.endsWith(".css")?"text/css":file.endsWith(".js")?"text/javascript":"text/html";
+ return new Response(Bun.file(new URL("./"+file,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'"}});
+}
 if(method==="GET"&&["/","/clinic","/clinic/","/ui-preview","/ui.js","/ui.css","/ui-views.js","/ui-consult.js"].includes(path)){
  const files={"/":"unified.html","/clinic":"unified.html","/clinic/":"unified.html","/ui-preview":"unified.html","/ui.js":"unified.js","/ui.css":"unified.css","/ui-views.js":"unified-views.js","/ui-consult.js":"unified-consult.js"};
  const file=files[path],mime=file.endsWith(".html")?"text/html":file.endsWith(".js")?"text/javascript":"text/css";
@@ -56,6 +63,7 @@ if(method!=="GET"){const o=req.headers.get("origin");if(o&&new URL(o).host!==url
 if(path==="/api/login"&&method==="POST"){const ip=req.headers.get("cf-connecting-ip")||"default",t=Date.now();const z=tries.get(ip)||{n:0,t};if(t-z.t>900000){z.n=0;z.t=t;}z.n++;tries.set(ip,z);if(z.n>15)return err("Too many login attempts",429);const b=await req.json();const rows=await sql.unsafe("SELECT * FROM clinic_users WHERE email=$1",[clean(b.email,160).toLowerCase()]);const u=rows[0];if(!u||!await Bun.password.verify(String(b.password||""),u.password_hash))return err("Invalid credentials",401);const tok=randomBytes(32).toString("base64url");await sql.unsafe("INSERT INTO clinic_sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '12 hours')",[hash(tok),u.id]);return reply({ok:true},200,{"Set-Cookie":cookie(tok,43200)});}
 const u=await userFrom(req);if(!u)return err("Sign in required",401);
 if(path.startsWith("/api/opd/"))return clinicAPI({sql,req,url,user:u,pack,unpack,reply,err});
+if(path==="/api/console/favorites")return consoleApi({sql,req,user:u,pack,unpack,reply,err});
 if(path==="/api/me"&&method==="GET")return reply({user:{email:u.email},aiConfigured:!!env.SARVAM_API_KEY});
 if(path==="/api/logout"&&method==="POST"){const t=(req.headers.get("cookie")||"").match(/dc_session=([^;]+)/)?.[1];if(t)await sql.unsafe("DELETE FROM clinic_sessions WHERE token_hash=$1",[hash(t)]);return reply({ok:true},200,{"Set-Cookie":cookie("",0)});}
 if(path==="/api/password"&&method==="POST"){const b=await req.json();if(!await Bun.password.verify(String(b.currentPassword||""),u.password_hash))return err("Current password incorrect",403);if(typeof b.newPassword!=="string"||b.newPassword.length<12||b.newPassword.length>128)return err("Use 12–128 characters");await sql.unsafe("UPDATE clinic_users SET password_hash=$1 WHERE id=$2",[await Bun.password.hash(b.newPassword,{algorithm:"argon2id"}),u.id]);return reply({ok:true});}
