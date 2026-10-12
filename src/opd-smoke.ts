@@ -19,7 +19,9 @@ try{
  }
  if(!ready)throw Error("Clinic app failed to start and complete database migrations");
  await check("/api/health",200,"databaseReady", "application/json");
- await check("/clinic",200,"Durva Clinic · OPD Management","text/html");
+ await check("/clinic",200,"Durva — Practice OS","text/html");
+ await check("/advanced",200,"Durva Clinic · OPD Management","text/html");
+ await check("/legacy",200,"Durva Clinic","text/html");
  await check("/clinic.js",200,"Doctor","text/javascript");
  await check("/clinic.css",200,".sidebar","text/css");
  await check("/ui-preview",200,"Durva — Practice OS","text/html");
