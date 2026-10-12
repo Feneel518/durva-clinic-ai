@@ -282,7 +282,7 @@ async function action(el){
  if(key==="addFav"){favoriteModal();return;}
  if(key==="closeModal"){$("favorite-modal")?.remove();return;}
  if(key==="deleteFav"){if(confirm("Remove this shortcut?")){await api("/api/opd/favorites/"+id,"DELETE");await loadFavorites();safeRender();}return;}
- if(key==="advanced"){location.assign("/clinic");return;}
+ if(key==="advanced"){location.assign("/advanced");return;}
 }
 document.addEventListener("submit",event=>{const form=event.target.closest("form[data-form]");if(!form)return;event.preventDefault();task(()=>formAction(form));});
 document.addEventListener("click",event=>{const el=event.target.closest("[data-act]");if(!el||el.disabled)return;event.preventDefault();task(()=>action(el));});
