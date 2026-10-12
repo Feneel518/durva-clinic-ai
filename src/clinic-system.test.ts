@@ -1,7 +1,7 @@
 import {describe,test,expect} from "bun:test";
 import {todayIST,normalizeAssessment,normalizeRx,pricePaise} from "./clinic-system";
 describe("Clinical input validation",()=>{
- test("local date follows India calendar",{timeout:5000},()=>{expect(todayIST()).toMatch(/^\d{4}-\d{2}-\d{2}$/);});
+ test("local date follows India calendar",()=>{expect(todayIST()).toMatch(/^\d{4}-\d{2}-\d{2}$/);});
  test("accepts measured vitals without inventing unknown values",()=>{
   const x=normalizeAssessment({systolic:"120",diastolic:"80",pulse:"72",tempC:"36.7",spo2:"99",complaint:"Fever"});
   expect(x.systolic).toBe(120);expect(x.diastolic).toBe(80);expect(x.tempC).toBe(36.7);expect(x.weightKg).toBe(null);expect(x.complaint).toBe("Fever");
