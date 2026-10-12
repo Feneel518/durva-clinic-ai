@@ -42,7 +42,7 @@ if(path==="/api/health")return reply({status:dbReady?"ok":"initializing",databas
 if(method==="GET"&&["/console","/console/","/console.css","/console.js"].includes(path)){
  const file=path.endsWith(".css")?"console.css":path.endsWith(".js")?"console.js":"console.html";
  const mime=file.endsWith(".css")?"text/css":file.endsWith(".js")?"text/javascript":"text/html";
- return new Response(Bun.file(new URL("./"+file,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'"}});
+ return new Response(Bun.file(new URL("./"+file,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'"}});
 }
 if(method==="GET"&&["/","/clinic","/clinic/","/ui-preview","/ui.js","/ui.css","/ui-views.js","/ui-consult.js"].includes(path)){
  const files={"/":"unified.html","/clinic":"unified.html","/clinic/":"unified.html","/ui-preview":"unified.html","/ui.js":"unified.js","/ui.css":"unified.css","/ui-views.js":"unified-views.js","/ui-consult.js":"unified-consult.js"};
