@@ -1,0 +1,164 @@
+/* Durva · quiet clinical interface
+   Frontend Design + Emil Design Engineering. Functional restraint for solo practice.
+   Only system fonts. Thin, legible rules; no cosmetic gradients or hover choreography. */
+:root{
+  --bg:#fafaf9;--paper:#ffffff;--ink:#24262b;--ink2:#4a4e54;--quiet:#777b81;
+  --edge:#e4e5e5;--garnet:#79334d;--garnet-dark:#64273f;--rose:#f7eff2;
+  --panel-shadow:0 1px 2px rgba(24,28,30,.018);--ease-out:cubic-bezier(.23,1,.32,1)
+}
+html{color-scheme:light;text-rendering:optimizeLegibility}
+body{background:var(--bg);color:var(--ink);line-height:1.54}
+.shell,.main,.container{min-width:0}
+.rail{background:#fff;border-right:1px solid var(--edge);padding:29px 17px 21px}
+.brand{margin-bottom:38px}
+.brand-symbol{background:var(--garnet);border-radius:11px;box-shadow:inset 0 1px 0 #ffffff22}
+.brand-name{font-weight:600}
+.brand-sub,.rail-label{color:#939299;letter-spacing:.08em}
+.nav{height:46px;border-radius:9px;color:#65676d;font-weight:570;transition:background-color 140ms ease,color 140ms ease}
+.nav.active{background:#f6f1f3;color:var(--garnet);font-weight:720}
+.nav:hover{background:#f7f7f6}
+.nav:active{transform:none}
+.rail-bottom{border-top-color:var(--edge)}
+.container{max-width:1260px;padding-top:30px}
+.topline{margin-bottom:27px;padding-bottom:20px;border-bottom:1px solid var(--edge)}
+.topline-left{font-size:12px;color:#73767c}
+.live-dot{box-shadow:0 0 0 3px #2d805315}
+.topline-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.headline{margin-bottom:26px}
+.headline h1{
+  font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+  font-size:clamp(33px,3.6vw,47px);font-weight:500;
+  letter-spacing:-.045em;line-height:1.16;color:var(--ink)
+}
+.head-eyebrow{font-size:12px;letter-spacing:0;text-transform:none;font-weight:670;color:var(--garnet)}
+.head-sub{font-size:13px;max-width:64ch;line-height:1.65;color:var(--quiet)}
+.hero{gap:14px;margin-bottom:18px;grid-template-columns:minmax(0,1.56fr) minmax(220px,.65fr)}
+.hero-main{
+ background:#fff;color:var(--ink);border:1px solid #dcdedf;border-radius:15px;
+ min-height:206px;padding:27px 29px;box-shadow:none
+}
+.hero-main:after{content:none}
+.hero-main .tag{font-size:11px;letter-spacing:0;text-transform:none;color:var(--garnet);font-weight:740}
+.hero-main h2{
+ color:var(--ink);font-family:"Iowan Old Style",Georgia,serif;
+ font-size:clamp(29px,3vw,38px);font-weight:500;line-height:1.17;
+ letter-spacing:-.04em;max-width:440px;margin:11px 0 9px
+}
+.hero-main p{max-width:420px;color:#76777c;font-size:12px;line-height:1.65}
+.hero-actions{margin-top:22px}
+.hero-main .btn{background:var(--garnet);color:white;border-color:var(--garnet)}
+.hero-main .btn:hover{background:var(--garnet-dark)}
+.hero-main .btn.alt{background:#fff;color:var(--garnet);border-color:#e1d8dc}
+.hero-main .btn.alt:hover{background:#fcf7f8}
+.hero-side{
+ background:#f6f5f3;border:1px solid var(--edge);border-radius:15px;
+ min-height:206px;padding:23px;box-shadow:none
+}
+.side-icon{background:#fff;border-color:#e4e3e1;border-radius:12px;width:42px;height:42px}
+.hero-side h3{color:var(--ink);font-size:17px;letter-spacing:-.03em}
+.hero-side p{color:var(--quiet)}
+.stats{border:1px solid var(--edge);border-radius:14px;box-shadow:none}
+.metric{padding:19px 21px}
+.metric label{color:#777c82}
+.metric strong{color:#2a2d31;font-size:26px;letter-spacing:-.045em;font-weight:650}
+.metric small{color:#929398}
+.columns{gap:14px}
+.panel{box-shadow:none;border:1px solid var(--edge);border-radius:14px;padding:23px}
+.panel-header h2{font-size:18px;letter-spacing:-.025em}
+.queue-item{padding:14px 2px;border-color:#ececec}
+.queue-item:hover,.patient-row:hover{background:#fafafa}
+.queue-no{border-color:#e9e7e5;border-radius:10px}
+.status{border-radius:7px}
+.btn{
+ border-radius:10px;min-height:44px;font-size:12px;
+ transition:transform 120ms var(--ease-out),background-color 140ms ease,border-color 140ms ease,color 140ms ease
+}
+.btn:active:not(:disabled){transform:scale(.977)}
+.btn.white{border-color:#e0e1e1;color:#3f4248}
+.btn.soft{border-color:#eadfe3;background:#f8f2f5}
+.btn.small{min-height:40px;padding:9px 12px}
+.btn.circle{min-height:42px;width:42px;height:42px}
+.form-grid{gap:13px}
+.field{gap:8px}
+.field label{font-size:12px;letter-spacing:0;color:#565a61;font-weight:660}
+.field input,.field select,.field textarea,.searchbox input{
+ min-height:44px;border-color:#dde0e0;border-radius:10px;
+ background:#fff;font-size:14px;line-height:1.45;padding:11px 13px
+}
+.field input:focus,.field select:focus,.field textarea:focus,.searchbox input:focus{
+ border-color:#9e6b80;box-shadow:0 0 0 3px #79334d16
+}
+.field textarea{min-height:88px}
+.pill{min-height:38px;display:inline-flex;align-items:center;border-radius:9px}
+.pill.selected{background:#f7edf1;border-color:#e7d2db}
+.progress{border-color:var(--edge);border-radius:13px;padding:15px 18px}
+.step-head h2{font-size:16px;letter-spacing:-.018em}
+.num{border-radius:8px}
+.recorder{background:#fbfafa;border-color:#e9e4e5;border-radius:12px}
+.visit-side{top:14px}
+.quick-summary{background:#fafaf9;border-color:var(--edge);border-radius:11px}
+.medicine{background:#fff;border-color:var(--edge)}
+.login-art{background:#28272b}
+.login-art:after{content:none}
+.login-card h2{font-family:"Iowan Old Style",Georgia,serif;font-weight:500;font-size:36px;letter-spacing:-.035em}
+.dialog{animation:dialog-enter 170ms var(--ease-out);box-shadow:0 25px 72px #13111329}
+.waiting-live{
+ display:inline-flex;align-items:center;gap:8px;
+ min-height:36px;max-height:40px;padding:7px 11px;
+ border:1px solid #e0e2e2;border-radius:10px;
+ background:#fff;color:#60656a;white-space:nowrap;
+ font-size:11px;font-weight:730;cursor:pointer;
+ transition:background-color 130ms ease,border-color 130ms ease
+}
+.waiting-live:hover{background:#f8f8f7}
+.waiting-live.has-waiting{background:#fff8ed;border-color:#ead5b9;color:#825d2b}
+.waiting-led{width:7px;height:7px;border-radius:50%;background:#b4bdba;flex-shrink:0}
+.has-waiting .waiting-led{background:#bd7e2e;box-shadow:0 0 0 3px #e6be7824}
+.waiting-live:focus-visible{outline:2px solid var(--garnet);outline-offset:3px}
+.quick-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.quick-actions .btn{white-space:nowrap}
+#today-queue{scroll-margin-top:20px}
+#toast{border-radius:11px;font-size:12px}
+@media(max-width:1120px){.hero{grid-template-columns:minmax(0,1.4fr) minmax(225px,.68fr)}.container{padding-top:25px}}
+@media(max-width:800px){
+ .container{padding:17px 16px 100px}
+ .topline{margin-bottom:23px}
+ .topline-right{gap:8px;margin-left:auto}
+ .waiting-live{min-height:35px}
+ .bottom-nav{padding-bottom:calc(8px + env(safe-area-inset-bottom));border-top-color:var(--edge)}
+ .bottom-nav button{min-height:46px;font-size:11px}
+ .bottom-nav button.active{background:#f7eff3}
+ .field input,.field select,.field textarea,.searchbox input{font-size:16px} /* prevent iOS input zoom */
+}
+@media(max-width:670px){
+ .headline h1{font-size:35px}
+ .hero{grid-template-columns:1fr;gap:10px}
+ .hero-main{min-height:0;padding:23px 20px}
+ .hero-main h2{font-size:30px}
+ .hero-side{min-height:0;padding:17px 20px;display:grid;grid-template-columns:1fr auto;gap:9px;align-items:center}
+ .hero-side .side-icon{display:none}
+ .hero-side h3{margin:0 0 5px}
+ .hero-side p{margin:0}
+ .hero-side .btn{align-self:center}
+ .stats{grid-template-columns:1fr 1fr}
+ .metric{padding:17px 14px}
+ .metric strong{font-size:24px}
+ .panel{padding:17px}
+ .patient-row{flex-wrap:wrap}
+ .quick-actions{width:100%;justify-content:flex-end}
+ .quick-actions .btn{flex:1}
+ .visit-side{position:static}
+ .topline-right .date{display:none}
+ .topline-right .waiting-label{font-size:11px}
+ .visit-head h1{font-size:30px}
+}
+@media(max-width:380px){
+ .topline-right>.btn{display:none}
+ .quick-actions{gap:6px}
+ .hero-main h2{font-size:28px}
+ .hero-side{grid-template-columns:1fr}
+ .hero-side .btn{justify-self:start}
+}
+@media(prefers-reduced-motion:reduce){
+ .btn,.nav,.waiting-live,.dialog{transition:none!important;animation:none!important}
+}
