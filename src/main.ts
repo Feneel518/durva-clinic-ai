@@ -37,6 +37,11 @@ const AUDIO_TYPES={"audio/mp4":"mp4","audio/m4a":"m4a","audio/x-m4a":"m4a","audi
 async function aiRequest(path,options){const result=await fetch("https://api.openai.com/v1"+path,{...options,signal:AbortSignal.timeout(180000)});if(!result.ok)throw Error("AI provider failed with status "+result.status);return result.json();}
 async function handle(req){const url=new URL(req.url),path=url.pathname,method=req.method;
 if(path==="/api/health")return reply({status:dbReady?"ok":"initializing",databaseReady:dbReady,issue:dbError? "Database startup failed":null},dbReady?200:503);
+if(method==="GET"&&["/ui-preview","/ui.js","/ui.css","/ui-views.js","/ui-consult.js"].includes(path)){
+ const files={"/ui-preview":"unified.html","/ui.js":"unified.js","/ui.css":"unified.css","/ui-views.js":"unified-views.js","/ui-consult.js":"unified-consult.js"};
+ const file=files[path],mime=file.endsWith(".html")?"text/html":file.endsWith(".js")?"text/javascript":"text/css";
+ return new Response(Bun.file(new URL("./"+file,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+}
 if(path==="/"&&method==="GET")return new Response(FRONTEND,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'"}});
 if(path==="/app.js"&&method==="GET")return new Response(CLIENT,{headers:{"Content-Type":"text/javascript; charset=utf-8","Cache-Control":"no-cache"}});
 if(method==="GET"&&(path==="/clinic"||path==="/clinic/"||path==="/clinic.js"||path==="/clinic.css")){
@@ -46,7 +51,7 @@ if(method==="GET"&&(path==="/clinic"||path==="/clinic/"||path==="/clinic.js"||pa
 }
 if(!path.startsWith("/api/"))return err("Not found",404);
 await initPromise;if(!dbReady)return err("Database not ready",503);
-if(!["GET","POST","PATCH","PUT"].includes(method))return err("Method unsupported",405);
+if(!["GET","POST","PATCH","PUT","DELETE"].includes(method))return err("Method unsupported",405);
 if(method!=="GET"){const o=req.headers.get("origin");if(o&&new URL(o).host!==url.host)return err("Origin rejected",403);if(req.headers.get("x-clinic-request")!=="1")return err("Request header missing",403);}
 if(path==="/api/login"&&method==="POST"){const ip=req.headers.get("cf-connecting-ip")||"default",t=Date.now();const z=tries.get(ip)||{n:0,t};if(t-z.t>900000){z.n=0;z.t=t;}z.n++;tries.set(ip,z);if(z.n>15)return err("Too many login attempts",429);const b=await req.json();const rows=await sql.unsafe("SELECT * FROM clinic_users WHERE email=$1",[clean(b.email,160).toLowerCase()]);const u=rows[0];if(!u||!await Bun.password.verify(String(b.password||""),u.password_hash))return err("Invalid credentials",401);const tok=randomBytes(32).toString("base64url");await sql.unsafe("INSERT INTO clinic_sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '12 hours')",[hash(tok),u.id]);return reply({ok:true},200,{"Set-Cookie":cookie(tok,43200)});}
 const u=await userFrom(req);if(!u)return err("Sign in required",401);
