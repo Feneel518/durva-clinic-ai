@@ -38,6 +38,8 @@ export async function ensureClinicSchema(sql){
  await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_opd_payments(id uuid PRIMARY KEY,bill_id uuid NOT NULL REFERENCES clinic_opd_bills(id),amount_paise bigint NOT NULL,mode text NOT NULL,created_at timestamptz NOT NULL DEFAULT now())");
  await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_opd_followups(id uuid PRIMARY KEY,entry_id uuid UNIQUE NOT NULL REFERENCES clinic_opd_entries(id),due_date date NOT NULL,notes_enc text NOT NULL,status text NOT NULL DEFAULT 'pending',created_at timestamptz NOT NULL DEFAULT now())");
  await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_opd_profile(id integer PRIMARY KEY CHECK(id=1),data_enc text NOT NULL,updated_at timestamptz NOT NULL DEFAULT now())");
+ await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_opd_favorites(id uuid PRIMARY KEY,owner_id uuid NOT NULL REFERENCES clinic_users(id),kind text NOT NULL,data_enc text NOT NULL,created_at timestamptz NOT NULL DEFAULT now())");
+ await sql.unsafe("CREATE INDEX IF NOT EXISTS clinic_opd_favorites_owner_idx ON clinic_opd_favorites(owner_id,kind,created_at DESC)");
  await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_opd_audit(id uuid PRIMARY KEY,actor_id uuid NOT NULL REFERENCES clinic_users(id),action text NOT NULL,entity_id uuid,created_at timestamptz NOT NULL DEFAULT now())");
 }
 export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
@@ -67,6 +69,36 @@ export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
  };
  const htmlEscape=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const printHTML=(title,body)=>new Response('<!doctype html><html lang="en"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; form-action \'none\';"><title>'+htmlEscape(title)+'</title><style>body{font:15px Arial,sans-serif;max-width:790px;margin:30px auto;padding:24px;color:#262328}h1{color:#792342}h2{font-size:21px}table{border-collapse:collapse;width:100%;margin-top:20px}td,th{border:1px solid #bbb;padding:9px;text-align:left}th{background:#f6f1f2}section{margin-top:16px}footer{margin-top:65px;text-align:right}p{white-space:pre-wrap}@media print{body{margin:0;padding:6mm}}</style><body>'+body+'</body></html>',{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer"}});
+
+ /* Favorite items are clinician-authored, encrypted and user-scoped. No drug library or AI prescribing. */
+ if(method==="GET"&&path==="/api/opd/favorites")return safe(async()=>{
+  const rows=await sql.unsafe("SELECT id,kind,data_enc FROM clinic_opd_favorites WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 80",[user.id]);
+  return reply({favorites:rows.map(x=>({id:x.id,kind:x.kind,...unpack(x.data_enc)}))});
+ });
+ if(method==="POST"&&path==="/api/opd/favorites")return safe(async()=>{
+  const b=await json(),kind=String(b.kind||"");
+  if(!["medicine","phrase"].includes(kind))return error("Invalid favorite type");
+  const label=scrub(b.label,110);if(label.length<2)return error("Enter a favorite name");
+  let saved={label};
+  if(kind==="medicine"){
+   const med={name:scrub(b.name,160),strength:scrub(b.strength,80),route:scrub(b.route,80),frequency:scrub(b.frequency,120),duration:scrub(b.duration,120),instructions:scrub(b.instructions,240)};
+   if(!med.name)return error("Enter a medicine name");
+   saved={...saved,...med};
+  }else{
+   const section=String(b.section||"");
+   if(!["chiefComplaint","historyOfPresentIllness","assessment","plan","advice"].includes(section))return error("Invalid template section");
+   const content=scrub(b.content,1500);if(!content)return error("Enter a template phrase");
+   saved={...saved,section,content};
+  }
+  const id=randomUUID();await sql.unsafe("INSERT INTO clinic_opd_favorites(id,owner_id,kind,data_enc) VALUES($1,$2,$3,$4)",[id,user.id,kind,pack(saved)]);
+  await audit("favorite.created",id);return reply({favorite:{id,kind,...saved}},201);
+ });
+ const favoriteDelete=/^\/api\/opd\/favorites\/([0-9a-f-]{36})$/.exec(path);
+ if(method==="DELETE"&&favoriteDelete)return safe(async()=>{
+  const r=await sql.unsafe("DELETE FROM clinic_opd_favorites WHERE id=$1 AND owner_id=$2 RETURNING id",[favoriteDelete[1],user.id]);
+  if(!r.length)return error("Favorite not found",404);
+  await audit("favorite.deleted",favoriteDelete[1]);return reply({ok:true});
+ });
  if(method==="GET"&&path==="/api/opd/profile")return reply({profile:await profile()});
  if(method==="PUT"&&path==="/api/opd/profile")return safe(async()=>{
   const b=await json(),d={clinicName:scrub(b.clinicName,130)||"Durva Clinic",clinicianName:scrub(b.clinicianName,130),registrationNumber:scrub(b.registrationNumber,120),address:scrub(b.address,300),phone:scrub(b.phone,25),consultationFee:scrub(b.consultationFee,16)};
