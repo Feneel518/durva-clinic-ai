@@ -213,7 +213,7 @@ async function recordPayment(form){
  const v=Object.fromEntries(new FormData(form));const d=await api("/api/opd/entries/"+S.entry.id+"/payment","POST",v);S.entry=d.entry;safeRender();toast("Payment recorded.");
 }
 function chooseDays(days){
- S.followDays=days;const d=new Date(Date.now()+19800000+days*86400000);S.followDate=d.toISOString().slice(0,10);captureConsult();safeRender();
+ captureConsult();S.followDays=days;const d=new Date(Date.now()+19800000+days*86400000);S.followDate=d.toISOString().slice(0,10);safeRender();
 }
 async function saveFollow(){
  captureConsult();if(!S.followDate)throw Error("Choose the follow-up date.");
