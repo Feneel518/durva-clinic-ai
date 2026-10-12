@@ -31,7 +31,7 @@ try{
  await check("/ui.css",200,".app-layout","text/css");
  await check("/api/opd/overview",401,"Sign in required","application/json");
  await check("/api/me",401,"Sign in required","application/json");
- await check("/",200,"Durva Clinic","text/html");
+ await check("/",200,"Durva — Practice OS","text/html");
  const db=new SQL(Bun.env.DATABASE_URL,{max:2});
  try{
   const r=await db.unsafe("SELECT COUNT(*)::int AS n FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('clinic_opd_entries','clinic_opd_assessments','clinic_opd_prescriptions','clinic_opd_bills','clinic_opd_payments','clinic_opd_followups','clinic_opd_profile','clinic_opd_audit')");
