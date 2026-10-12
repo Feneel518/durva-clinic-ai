@@ -151,7 +151,7 @@ export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
    const blank={chiefComplaint:"",historyOfPresentIllness:"",pastHistory:"",examination:"",assessment:"",plan:"",medications:"",followUp:"",uncertainties:""};
    await sql.unsafe("INSERT INTO clinic_visits(id,patient_id,language,note_enc) VALUES($1,$2,$3,$4)",[visitId,e.patient_id,"Gujarati + Hindi + English",pack(blank)]);
   }
-  await sql.unsafe("UPDATE clinic_opd_entries SET status=$1,visit_id=COALESCE(visit_id,$2),started_at=CASE WHEN $1='in_consultation' THEN now() ELSE started_at END,completed_at=CASE WHEN $1='completed' THEN now() ELSE completed_at END,updated_at=now() WHERE id=$3",[b.status,visitId]);
+  await sql.unsafe("UPDATE clinic_opd_entries SET status=$1,visit_id=COALESCE(visit_id,$2),started_at=CASE WHEN $1='in_consultation' THEN now() ELSE started_at END,completed_at=CASE WHEN $1='completed' THEN now() ELSE completed_at END,updated_at=now() WHERE id=$3",[b.status,visitId,e.id]);
   await audit("entry.status."+b.status,e.id);return reply({entry:await full(e.id)});
  });
  const assess=/^\/api\/opd\/entries\/([0-9a-f-]{36})\/assessment$/.exec(path);
