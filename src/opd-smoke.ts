@@ -22,6 +22,11 @@ try{
  await check("/clinic",200,"Durva Clinic · OPD Management","text/html");
  await check("/clinic.js",200,"Doctor","text/javascript");
  await check("/clinic.css",200,".sidebar","text/css");
+ await check("/ui-preview",200,"Durva — Practice OS","text/html");
+ await check("/ui.js",200,"newEncounter","text/javascript");
+ await check("/ui-views.js",200,"Patient directory","text/javascript");
+ await check("/ui-consult.js",200,"Single-screen clinician","text/javascript");
+ await check("/ui.css",200,".app-layout","text/css");
  await check("/api/opd/overview",401,"Sign in required","application/json");
  await check("/api/me",401,"Sign in required","application/json");
  await check("/",200,"Durva Clinic","text/html");
