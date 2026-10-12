@@ -2,6 +2,7 @@ import {randomUUID} from "node:crypto";
 
 const statuses=["scheduled","waiting","in_consultation","completed","cancelled","no_show"];
 const transitions={scheduled:["waiting","cancelled","no_show"],waiting:["in_consultation","cancelled"],in_consultation:["completed","waiting"],completed:[],cancelled:[],no_show:[]};
+const formatSQLDate=d=>d instanceof Date?d.toISOString().slice(0,10):String(d??"").slice(0,10);
 const validDate=s=>typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!Number.isNaN(Date.parse(s+"T00:00:00Z"));
 export const todayIST=()=>new Date(Date.now()+19800000).toISOString().slice(0,10);
 const int=(v,min,max)=>{if(v===""||v===null||v===undefined)return null;const n=Number(v);if(!Number.isFinite(n)||n<min||n>max)throw Error("Value outside permitted range");return n;};
@@ -48,7 +49,7 @@ export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
  const profile=async()=>{const r=await sql.unsafe("SELECT data_enc FROM clinic_opd_profile WHERE id=1");return r[0]?unpack(r[0].data_enc):{clinicName:"Durva Clinic",clinicianName:"",registrationNumber:"",address:"",phone:"",consultationFee:"300"};};
  const patient=async id=>{const r=await sql.unsafe("SELECT id,seq,data_enc FROM clinic_patients WHERE id=$1",[id]);return r[0]?{id:r[0].id,code:"DC-"+String(r[0].seq).padStart(5,"0"),...unpack(r[0].data_enc)}:null;};
  const entry=async id=>{const r=await sql.unsafe("SELECT * FROM clinic_opd_entries WHERE id=$1",[id]);return r[0]||null;};
- const light=r=>({id:r.id,patientId:r.patient_id,visitId:r.visit_id,queueNo:Number(r.queue_no),date:String(r.visit_date).slice(0,10),scheduledAt:r.scheduled_at,status:r.status,reason:unpack(r.reason_enc),createdAt:r.created_at});
+ const light=r=>({id:r.id,patientId:r.patient_id,visitId:r.visit_id,queueNo:Number(r.queue_no),date:formatSQLDate(r.visit_date),scheduledAt:r.scheduled_at,status:r.status,reason:unpack(r.reason_enc),createdAt:r.created_at});
  const full=async id=>{
   const e=await entry(id);if(!e)return null;
   const [a,rx,b,fu]=await Promise.all([
@@ -62,7 +63,7 @@ export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
    const pays=await sql.unsafe("SELECT amount_paise,mode,created_at FROM clinic_opd_payments WHERE bill_id=$1 ORDER BY created_at",[b[0].id]);
    bill={id:b[0].id,number:Number(b[0].bill_no),items:unpack(b[0].items_enc),totalPaise:Number(b[0].total_paise),paidPaise:pays.reduce((n,p)=>n+Number(p.amount_paise),0),payments:pays.map(p=>({amountPaise:Number(p.amount_paise),mode:p.mode,at:p.created_at}))};
   }
-  return {...light(e),patient:await patient(e.patient_id),assessment:a[0]?unpack(a[0].data_enc):{},prescription:rx[0]?{...unpack(rx[0].data_enc),signedAt:rx[0].signed_at}:null,bill,followup:fu[0]?{id:fu[0].id,dueDate:String(fu[0].due_date).slice(0,10),notes:unpack(fu[0].notes_enc),status:fu[0].status}:null};
+  return {...light(e),patient:await patient(e.patient_id),assessment:a[0]?unpack(a[0].data_enc):{},prescription:rx[0]?{...unpack(rx[0].data_enc),signedAt:rx[0].signed_at}:null,bill,followup:fu[0]?{id:fu[0].id,dueDate:formatSQLDate(fu[0].due_date),notes:unpack(fu[0].notes_enc),status:fu[0].status}:null};
  };
  const htmlEscape=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const printHTML=(title,body)=>new Response('<!doctype html><html lang="en"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; form-action \'none\';"><title>'+htmlEscape(title)+'</title><style>body{font:15px Arial,sans-serif;max-width:790px;margin:30px auto;padding:24px;color:#262328}h1{color:#792342}h2{font-size:21px}table{border-collapse:collapse;width:100%;margin-top:20px}td,th{border:1px solid #bbb;padding:9px;text-align:left}th{background:#f6f1f2}section{margin-top:16px}footer{margin-top:65px;text-align:right}p{white-space:pre-wrap}@media print{body{margin:0;padding:6mm}}</style><body>'+body+'</body></html>',{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer"}});
@@ -88,7 +89,7 @@ export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
  });
  if(method==="GET"&&path==="/api/opd/followups")return safe(async()=>{
   const r=await sql.unsafe("SELECT f.*,e.patient_id,p.seq,p.data_enc FROM clinic_opd_followups f JOIN clinic_opd_entries e ON e.id=f.entry_id JOIN clinic_patients p ON p.id=e.patient_id WHERE f.status='pending' ORDER BY f.due_date ASC LIMIT 300");
-  return reply({followups:r.map(x=>({id:x.id,entryId:x.entry_id,dueDate:String(x.due_date).slice(0,10),notes:unpack(x.notes_enc),patient:{id:x.patient_id,name:unpack(x.data_enc).name,phone:unpack(x.data_enc).phone,code:"DC-"+String(x.seq).padStart(5,"0")}}))});
+  return reply({followups:r.map(x=>({id:x.id,entryId:x.entry_id,dueDate:formatSQLDate(x.due_date),notes:unpack(x.notes_enc),patient:{id:x.patient_id,name:unpack(x.data_enc).name,phone:unpack(x.data_enc).phone,code:"DC-"+String(x.seq).padStart(5,"0")}}))});
  });
  if(method==="POST"&&path==="/api/opd/entries")return safe(async()=>{
   const b=await json(),p=await patient(b.patientId);if(!p)return error("Invalid patient",404);
@@ -142,16 +143,19 @@ export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
   if(["cancelled","no_show"].includes(e.status))return error("Cannot sign for cancelled entry");
   const d=await profile();if(!d.clinicianName||!d.registrationNumber)return error("Configure clinician name and medical registration number in Settings before signing.");
   const b=await json();if(b.reviewed!==true)return error("Prescription requires clinician confirmation");
-  const r=await sql.unsafe("UPDATE clinic_opd_prescriptions SET signed_at=now(),signed_by=$1 WHERE entry_id=$2 AND signed_at IS NULL RETURNING entry_id",[user.id,e.id]);
+  const prior=await sql.unsafe("SELECT data_enc,signed_at FROM clinic_opd_prescriptions WHERE entry_id=$1",[e.id]);
+  if(!prior[0]||prior[0].signed_at)return error("Prescription missing or already signed",409);
+  const signedContent={...unpack(prior[0].data_enc),signer:{clinicianName:d.clinicianName,registrationNumber:d.registrationNumber,clinicName:d.clinicName,address:d.address,phone:d.phone,reviewedBy:user.email}};
+  const r=await sql.unsafe("UPDATE clinic_opd_prescriptions SET data_enc=$1,signed_at=now(),signed_by=$2 WHERE entry_id=$3 AND signed_at IS NULL RETURNING entry_id",[pack(signedContent),user.id,e.id]);
   if(!r.length)return error("Prescription missing or already signed",409);
   await audit("prescription.signed",e.id);return reply({entry:await full(e.id)});
  });
  const prescriptionPrint=/^\/api\/opd\/entries\/([0-9a-f-]{36})\/prescription\/print$/.exec(path);
  if(method==="GET"&&prescriptionPrint)return safe(async()=>{
   const d=await full(prescriptionPrint[1]);if(!d)return error("Entry not found",404);if(!d.prescription?.signedAt)return error("Prescription must be signed before printing",403);
-  const pro=await profile(),r=d.prescription,esc=htmlEscape;
+  const r=d.prescription,pro=r.signer||await profile(),esc=htmlEscape;
   const meds=r.medicines.map((m,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(m.name)+' '+esc(m.strength)+'</td><td>'+esc(m.route)+'</td><td>'+esc(m.frequency)+'</td><td>'+esc(m.duration)+'</td><td>'+esc(m.instructions)+'</td></tr>').join("");
-  const body='<header><h1>'+esc(pro.clinicName)+'</h1><p>'+esc(pro.address)+' '+esc(pro.phone)+'</p><hr><strong>'+esc(pro.clinicianName)+'</strong> · Reg. '+esc(pro.registrationNumber)+'</header><section>Patient: '+esc(d.patient.name)+' · '+esc(d.patient.code)+' · Age: '+esc(d.patient.age)+' · Date: '+esc(d.date)+'</section><h2>Prescription</h2>'+(r.diagnosis?'<section><strong>Assessment:</strong> '+esc(r.diagnosis)+'</section>':'')+'<table><tr><th>#</th><th>Medicine</th><th>Route</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr>'+meds+'</table>'+(r.investigations?'<section><strong>Investigations:</strong><p>'+esc(r.investigations)+'</p></section>':'')+(r.advice?'<section><strong>Instructions:</strong><p>'+esc(r.advice)+'</p></section>':'')+'<footer>Reviewed and signed electronically by<br>'+esc(pro.clinicianName)+'<br>Registration '+esc(pro.registrationNumber)+'</footer>';
+  const body='<header><h1>'+esc(pro.clinicName)+'</h1><p>'+esc(pro.address)+' '+esc(pro.phone)+'</p><hr><strong>'+esc(pro.clinicianName)+'</strong> · Reg. '+esc(pro.registrationNumber)+'</header><section>Patient: '+esc(d.patient.name)+' · '+esc(d.patient.code)+' · Age: '+esc(d.patient.age)+' · Date: '+esc(d.date)+'</section><h2>Prescription</h2>'+(r.diagnosis?'<section><strong>Assessment:</strong> '+esc(r.diagnosis)+'</section>':'')+'<table><tr><th>#</th><th>Medicine</th><th>Route</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr>'+meds+'</table>'+(r.investigations?'<section><strong>Investigations:</strong><p>'+esc(r.investigations)+'</p></section>':'')+(r.advice?'<section><strong>Instructions:</strong><p>'+esc(r.advice)+'</p></section>':'')+'<footer>Clinician review recorded in clinic system<br>'+esc(pro.clinicianName)+'<br>Registration '+esc(pro.registrationNumber)+'<p style="margin-top:40px">Doctor’s signature / stamp: ___________________</p></footer>';
   return printHTML("Signed OPD Prescription",body);
  });
  const bill=/^\/api\/opd\/entries\/([0-9a-f-]{36})\/bill$/.exec(path);
