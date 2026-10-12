@@ -1,6 +1,7 @@
 import { SQL } from "bun";
 import { startBatch, checkBatch, structure } from "./sarvam";
-import { randomBytes, createHash, createCipheriv, createDecipheriv, timingSafeEqual, randomUUID } from "node:crypto";
+import { extractVoicePatient } from "./patient-registration";
+import { randomBytes, createHash, createHmac, createCipheriv, createDecipheriv, timingSafeEqual, randomUUID } from "node:crypto";
 const env=Bun.env;
 if(!env.DATABASE_URL||!env.APP_ENCRYPTION_KEY)throw Error("Database and encryption key required");
 const key=Buffer.from(env.APP_ENCRYPTION_KEY,"base64");
@@ -46,6 +47,47 @@ if(path==="/api/me"&&method==="GET")return reply({user:{email:u.email},aiConfigu
 if(path==="/api/logout"&&method==="POST"){const t=(req.headers.get("cookie")||"").match(/dc_session=([^;]+)/)?.[1];if(t)await sql.unsafe("DELETE FROM clinic_sessions WHERE token_hash=$1",[hash(t)]);return reply({ok:true},200,{"Set-Cookie":cookie("",0)});}
 if(path==="/api/password"&&method==="POST"){const b=await req.json();if(!await Bun.password.verify(String(b.currentPassword||""),u.password_hash))return err("Current password incorrect",403);if(typeof b.newPassword!=="string"||b.newPassword.length<12||b.newPassword.length>128)return err("Use 12–128 characters");await sql.unsafe("UPDATE clinic_users SET password_hash=$1 WHERE id=$2",[await Bun.password.hash(b.newPassword,{algorithm:"argon2id"}),u.id]);return reply({ok:true});}
 if(path==="/api/state"&&method==="GET")return reply({patients:await patientList(),visits:await visits()});
+
+/* Voice registration tokens are stateless, short-lived and bound to the signed-in clinic user. */
+const voiceLimits=new Map();
+function patientVoiceSignature(userId,job,expires){
+ return createHmac("sha256",key).update("patient-registration:"+userId+":"+job+":"+expires).digest("hex");
+}
+if(path==="/api/patients/voice"&&method==="POST"){
+ if(!env.SARVAM_API_KEY)return err("Voice registration provider unavailable",503);
+ if(req.headers.get("x-voice-consent")!=="confirmed")return err("Consent is required before recording patient details",403);
+ const rawType=(req.headers.get("content-type")||"").split(";")[0];
+ if(!AUDIO_TYPES[rawType])return err("Unsupported audio recording format",415);
+ if(Number(req.headers.get("content-length")||0)>15000000)return err("Voice registration recording is too large",413);
+ const bytes=await req.arrayBuffer();
+ if(bytes.byteLength<1024||bytes.byteLength>15000000)return err("Voice registration audio must be between 1 KB and 15 MB",413);
+ const now=Date.now(),limit=voiceLimits.get(u.id)||{count:0,at:now};
+ if(now-limit.at>600000){limit.count=0;limit.at=now;}
+ if(limit.count>=12)return err("Too many registration recordings. Try again shortly.",429);
+ limit.count++;voiceLimits.set(u.id,limit);
+ let job;
+ try{job=await startBatch(bytes,rawType,env.SARVAM_API_KEY);}
+ catch(e){console.error("Patient voice upload failed",String(e?.message||e).slice(0,100));return err("Sarvam could not process this recording. Please retry.",502);}
+ const expires=Date.now()+30*60*1000,signature=patientVoiceSignature(u.id,job,expires);
+ return reply({state:"processing",job,ticket:expires+"."+signature,expiresAt:expires});
+}
+if(path==="/api/patients/voice/status"&&method==="GET"){
+ const job=url.searchParams.get("job")||"",ticket=url.searchParams.get("ticket")||"";
+ const parts=/^(\d{13})\.([a-f0-9]{64})$/.exec(ticket);
+ if(!/^[\w-]{6,160}$/.test(job)||!parts)return err("Invalid or expired voice registration request",403);
+ const expires=Number(parts[1]);if(!Number.isSafeInteger(expires)||expires<Date.now()||expires>Date.now()+31*60*1000)return err("Voice registration expired. Please record again.",403);
+ const a=Buffer.from(parts[2],"hex"),b=Buffer.from(patientVoiceSignature(u.id,job,expires),"hex");
+ if(!timingSafeEqual(a,b))return err("Voice registration authorization failed",403);
+ let result;
+ try{result=await checkBatch(job,env.SARVAM_API_KEY);}
+ catch(e){console.error("Patient voice status failed",String(e?.message||e).slice(0,100));return err("Unable to check transcription yet. Try again.",502);}
+ if(result.state!=="completed")return reply(result);
+ try{
+ const parsed=await extractVoicePatient(result.transcript,env.SARVAM_API_KEY);
+ return reply({state:"completed",fields:parsed.fields,uncertainties:parsed.uncertainties,transcript:result.transcript.slice(0,12000)});
+ }catch(e){console.error("Patient voice field extraction failed",String(e?.message||e).slice(0,100));return err("Transcribed audio, but could not interpret the registration. Check status again.",502);}
+}
+
 if(path==="/api/patients"&&method==="POST"){const b=await req.json();if(clean(b.name,120).length<2)return err("Patient name required");const id=randomUUID(),info={name:clean(b.name,120),age:clean(b.age,12),sex:clean(b.sex,30),phone:clean(b.phone,30),address:clean(b.address,300),allergies:clean(b.allergies,800)};await sql.unsafe("INSERT INTO clinic_patients(id,data_enc) VALUES($1,$2)",[id,pack(info)]);return reply({id},201);}
 const pid=path.match(/^\/api\/patient\/([0-9a-f-]{36})$/);if(pid&&method==="GET"){const p=(await patientList()).find(x=>x.id===pid[1]);if(!p)return err("Patient not found",404);return reply({patient:p,visits:await visits(p.id)});}
 if(path==="/api/visits"&&method==="POST"){const b=await req.json();const p=await sql.unsafe("SELECT id FROM clinic_patients WHERE id=$1",[b.patientId]);if(!p[0])return err("Patient not found",404);const id=randomUUID();await sql.unsafe("INSERT INTO clinic_visits(id,patient_id,language,note_enc) VALUES($1,$2,$3,$4)",[id,b.patientId,clean(b.language,45)||"Gujarati + Hindi + English",pack(blank())]);return reply({visit:{id}},201);}
