@@ -32,6 +32,7 @@ try{
  await check("/console",200,"Your everyday practice","text/html");
  await check("/console.js",200,"finishVisit","text/javascript");
  await check("/console.css",200,".hero-main","text/css");
+ await check("/console-polish.css",200,".waiting-live","text/css");
  await check("/api/console/favorites",401,"Sign in required","application/json");
  await check("/api/opd/overview",401,"Sign in required","application/json");
  await check("/api/me",401,"Sign in required","application/json");
