@@ -44,8 +44,8 @@ if(method==="GET"&&["/console","/console/","/console.css","/console.js"].include
  const mime=file.endsWith(".css")?"text/css":file.endsWith(".js")?"text/javascript":"text/html";
  return new Response(Bun.file(new URL("./"+file,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'"}});
 }
-if(method==="GET"&&["/","/clinic","/clinic/","/ui-preview","/ui.js","/ui.css","/ui-views.js","/ui-consult.js"].includes(path)){
- const files={"/":"unified.html","/clinic":"unified.html","/clinic/":"unified.html","/ui-preview":"unified.html","/ui.js":"unified.js","/ui.css":"unified.css","/ui-views.js":"unified-views.js","/ui-consult.js":"unified-consult.js"};
+if(method==="GET"&&["/","/clinic","/clinic/","/classic","/ui-preview","/ui.js","/ui.css","/ui-views.js","/ui-consult.js"].includes(path)){
+ const files={"/":"console.html","/clinic":"console.html","/clinic/":"console.html","/classic":"unified.html","/ui-preview":"unified.html","/ui.js":"unified.js","/ui.css":"unified.css","/ui-views.js":"unified-views.js","/ui-consult.js":"unified-consult.js"};
  const file=files[path],mime=file.endsWith(".html")?"text/html":file.endsWith(".js")?"text/javascript":"text/css";
  return new Response(Bun.file(new URL("./"+file,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 }
