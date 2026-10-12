@@ -17,7 +17,7 @@ function wrap(s,body){
  const doctor=s.profile?.clinicianName||'Doctor';
  return '<div class="app-layout"><aside class="side"><div class="logo"><span class="brandmark">✚</span><div><div class="logo-name">durva<span style="color:var(--brand)">.</span></div><span class="logo-sub">Practice OS</span></div></div><div class="nav-label">Your workspace</div>'+
  nav.map(n=>'<button type="button" class="nav '+(is(n[0])?'active':'')+'" data-act="nav" data-page="'+n[0]+'">'+I(n[1])+n[2]+'</button>').join('')+
- '<div class="side-foot"><div class="doctor-chip"><span class="avatar">'+E(doctor.slice(0,1))+'</span><div><strong>'+E(doctor)+'</strong><small>'+E(s.user?.email||'Clinic')</small></div></div><button class="side-logout" data-act="logout">'+I('logout')+' Sign out</button></div></aside>'+
+ '<div class="side-foot"><div class="doctor-chip"><span class="avatar">'+E(doctor.slice(0,1))+'</span><div><strong>'+E(doctor)+'</strong><small>'+E(s.user?.email||'Clinic')+'</small></div></div><button class="side-logout" data-act="logout">'+I('logout')+' Sign out</button></div></aside>'+
  '<div class="content"><div class="toprow"><div class="date-top">'+E(new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',timeZone:'Asia/Kolkata'}))+'</div><div class="top-right"><span class="chip" style="background:#eaf4ed;color:#3e7959">● Clinic online</span>'+B(I('search'),'patients','outline small','aria-label="Find patient"')+'</div></div>'+body+'</div></div>'+
  '<nav class="mobile-nav">'+nav.map(n=>'<button class="'+(is(n[0])?'active':'')+'" data-act="nav" data-page="'+n[0]+'">'+I(n[1])+n[2]+'</button>').join('')+'</nav>';
 }
