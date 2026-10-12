@@ -425,7 +425,7 @@ async function removeFavorite(index){
 }
 async function action(el){
  const cmd=el.dataset.action;
- if(cmd==="overlay-bg"){if(el===event?.target){S.overlay=null;render();}return;}
+ if(cmd==="overlay-bg"){S.overlay=null;render();return;}
  if(cmd==="noop")return;
  if(cmd==="navigate"){await navigate(el.dataset.to);return;}
  if(cmd==="back"){await loadHome();return;}
