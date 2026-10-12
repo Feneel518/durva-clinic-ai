@@ -26,3 +26,10 @@ describe("Clinical input validation",()=>{
   expect(()=>pricePaise("2.999")).toThrow();
  });
 });
+
+test("OPD status transition binds its encounter ID (regression for Begin consultation 500)",async()=>{
+ const code=await Bun.file(new URL("./clinic-system.ts",import.meta.url)).text();
+ const statement=code.split("\n").find(line=>line.includes("UPDATE clinic_opd_entries SET status=$1"));
+ expect(statement).toBeDefined();
+ expect(statement).toContain("WHERE id=$3\",[b.status,visitId,e.id]");
+});
