@@ -44,6 +44,29 @@ function area(label,key,value,placeholder=""){return '<div class="field"><label>
 function status(x){return '<span class="status '+E(x||"")+'">'+E((x||"waiting").replaceAll("_"," "))+'</span>';}
 function patientAvatar(p){return '<span class="pat-avatar">'+E(String(p?.name||"P").slice(0,1).toUpperCase())+'</span>';}
 function navItems(){return [["today","home","Today"],["patients","users","Patients"],["followups","clock","Follow-ups"],["more","settings","More"]];}
+
+function waitingCount(){return (S.overview?.entries||[]).filter(x=>x.status==="waiting").length;}
+function waitingBadge(){
+ const count=waitingCount();
+ return '<button type="button" id="waiting-live" class="waiting-live '+(count?"has-waiting":"is-clear")+'" data-action="show-queue" aria-live="polite" aria-label="'+count+' patients waiting; show queue"><span class="waiting-led" aria-hidden="true"></span><span class="waiting-label">'+(count?count+' waiting':"Queue clear")+'</span></button>';
+}
+let queueRefreshInFlight=false;
+async function refreshQueue({notify=true}={}){
+ if(!S.auth||document.visibilityState==="hidden"||queueRefreshInFlight||S.busy||S.recording?.state==="recording")return;
+ queueRefreshInFlight=true;
+ try{
+  const result=await api("/api/opd/overview?date="+dateIST());
+  const before=waitingCount();
+  S.overview=result;
+  const after=waitingCount();
+  const badge=document.getElementById("waiting-live");
+  if(badge){const temp=document.createElement("span");temp.innerHTML=waitingBadge();badge.replaceWith(temp.firstElementChild);}
+  if(S.page==="today"&&!S.overlay&&!S.entry&&!document.activeElement?.matches("input,textarea,select,[contenteditable]"))render();
+  if(notify&&after>before)toast(after-before===1?"A patient is waiting.":(after-before)+" more patients are waiting.");
+ }catch{/* Last-known queue state remains visible during transient failures. */}
+ finally{queueRefreshInFlight=false;}
+}
+
 function chrome(body){
  const nav=navItems();
  return '<div class="shell"><aside class="rail"><div class="brand"><span class="brand-symbol">✳</span><span><div class="brand-name">durva<span style="color:var(--garnet)">.</span></div><div class="brand-sub">CLINIC WORKSPACE</div></span></div><div class="rail-label">Your practice</div>'+
@@ -51,7 +74,7 @@ function chrome(body){
  '<div class="rail-rule"></div><button class="nav" data-action="start"><span class="nav-icon">'+icon("plus",18)+'</span>New consultation</button>'+
  '<div class="rail-bottom"><div class="doctor-pill"><span class="avatar">Dr</span><span class="doctor-meta"><strong>'+E(S.profile?.clinicianName||S.user?.email||"Your practice")+'</strong><small>Private clinic account</small></span></div></div></aside>'+
  '<div class="main"><div class="container"><div class="topline"><span class="topline-left"><span class="live-dot"></span> Practice workspace <span style="color:#d4d1d4">/</span> '+(S.entry?"Consultation":S.page==="today"?"Today":S.page==="more"?"Settings":S.page==="followups"?"Follow-ups":"Patients")+'</span>'+
- '<span class="mobile-brand"><span class="brand-symbol">✳</span>durva.</span><span class="topline-right"><span class="date">'+E(dayLabel())+'</span>'+btn(icon("plus",17)+" New visit","start","white small")+'</span></div>'+body+'</div></div></div>'+
+ '<span class="mobile-brand"><span class="brand-symbol">✳</span>durva.</span><span class="topline-right">'+waitingBadge()+'<span class="date">'+E(dayLabel())+'</span>'+btn(icon("plus",17)+" New visit","start","white small")+'</span></div>'+body+'</div></div></div>'+
  '<nav class="bottom-nav" aria-label="Main navigation">'+nav.map(x=>'<button data-action="navigate" data-to="'+x[0]+'" class="'+(S.page===x[0]?"active":"")+'"><span>'+icon(x[1],19)+'</span>'+x[2]+'</button>').join("")+'</nav>';
 }
 function overlayHtml(){
@@ -105,13 +128,13 @@ function login(){
  '<button class="btn full" type="submit">Sign in to clinic '+icon("arrow",16)+'</button><p class="micro" style="margin-top:18px;text-align:center">Authorized clinical staff only</p></form></div></div>';
 }
 function today(){
- const o=S.overview||{entries:[],stats:{}},n=o.stats,waiting=o.entries.filter(x=>x.status==="waiting"||x.status==="in_consultation");
- const recent=o.entries.slice(0,7),followups=S.followups.slice(0,5);
- return '<div class="headline"><div><div class="head-eyebrow">Good '+(new Date().getHours()<12?"morning":new Date().getHours()<17?"afternoon":"evening")+'</div><h1>Your day, in focus.</h1><p class="head-sub">A clear view of what matters in your practice today.</p></div></div>'+
- '<div class="hero"><section class="hero-main"><div><div class="tag">READY WHEN YOU ARE</div><h2>Every patient deserves your full attention.</h2><p>Find a patient, speak your notes, and finish the visit without switching screens.</p></div><div class="hero-actions">'+btn(icon("plus",17)+" Start consultation","start","")+btn(icon("mic",17)+" Voice register","open-register","alt")+'</div></section>'+
+ const o=S.overview||{entries:[],stats:{}},n=o.stats,waiting=o.entries.filter(x=>x.status==="waiting");
+ const recent=[...o.entries].sort((a,b)=>{const priority=x=>x.status==="waiting"?0:x.status==="in_consultation"?1:x.status==="scheduled"?2:3;return priority(a)-priority(b);}).slice(0,7),followups=S.followups.slice(0,5);
+ return '<div class="headline"><div><div class="head-eyebrow">Good '+(new Date().getHours()<12?"morning":new Date().getHours()<17?"afternoon":"evening")+'</div><h1>Ready for the next patient?</h1><p class="head-sub">Your entire practice, without the paperwork.</p></div></div>'+
+ '<div class="hero"><section class="hero-main"><div><div class="tag">A quieter way to consult</div><h2>Care first. Notes handled.</h2><p>Find a patient, record the visit, review, and finish.</p></div><div class="hero-actions">'+btn(icon("plus",17)+" Start consultation","start","")+btn(icon("mic",17)+" Voice register","open-register","alt")+'</div></section>'+
  '<section class="hero-side"><div class="side-icon">'+icon("clock",22)+'</div><div><h3>'+(waiting.length?waiting.length+" patient"+(waiting.length===1?"":"s")+" waiting":"A little breathing room.")+'</h3><p>'+(waiting.length?"Your next consultations are ready below.":"There are no patients waiting right now.")+'</p>'+btn(waiting.length?"Open next patient":"Find a patient","open-next","white small")+'</div></section></div>'+
- '<div class="stats">'+[["In queue",n.waiting||0,"Waiting to be seen"],["Consulting",n.active||0,"Currently with doctor"],["Completed",n.completed||0,"Visits finished"],["Collected",money(n.collectedPaise),"Payments received"]].map(x=>'<div class="metric"><label>'+x[0]+'</label><strong>'+x[1]+'</strong><small>'+x[2]+'</small></div>').join("")+'</div>'+
- '<div class="columns"><section class="panel"><div class="panel-header"><div><h2>Today’s patients</h2><div class="caption">Walk-ins and appointments</div></div>'+btn("See all","navigate","white small",'data-to="patients"')+'</div>'+
+ '<div class="stats">'+[["Waiting",n.waiting||0,"Checked in"],["Consulting",n.active||0,"Currently with doctor"],["Completed",n.completed||0,"Visits finished"],["Collected",money(n.collectedPaise),"Payments received"]].map(x=>'<div class="metric"><label>'+x[0]+'</label><strong>'+x[1]+'</strong><small>'+x[2]+'</small></div>').join("")+'</div>'+
+ '<div class="columns"><section class="panel" id="today-queue"><div class="panel-header"><div><h2>Today’s patients</h2><div class="caption">Walk-ins and appointments</div></div>'+btn("See all","navigate","white small",'data-to="patients"')+'</div>'+
  (recent.length?'<div class="queue-list">'+recent.map(q=>queueRow(q)).join("")+'</div>':'<div class="empty">'+svgEmpty+'<strong>Your clinic desk is clear.</strong>Register a patient or start a consultation to begin.</div>')+'</section>'+
  '<section class="panel"><div class="panel-header"><div><h2>Follow-ups</h2><div class="caption">Upcoming reviews</div></div>'+btn("View","navigate","white small",'data-to="followups"')+'</div>'+
  (followups.length?followups.map(f=>'<div class="follow-item"><div><div class="follow-name">'+E(f.patient.name)+'</div><div class="follow-date">'+E(f.dueDate)+' · '+E(f.patient.phone||"")+'</div></div>'+btn(icon("arrow",15),"open-entry","white circle",'data-id="'+E(f.entryId)+'"')+'</div>').join(""):'<div class="empty" style="padding:20px">No pending follow-ups.</div>')+
@@ -494,3 +517,6 @@ document.addEventListener("submit",e=>{
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.overlay){S.overlay=null;render();}});
 bootstrap();
+setInterval(()=>{void refreshQueue();},30000);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")void refreshQueue();});
+window.addEventListener("focus",()=>{void refreshQueue();});
