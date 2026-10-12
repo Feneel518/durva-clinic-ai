@@ -2,12 +2,16 @@
 
 Mobile-first outpatient clinic management for Durva Clinic, deployed on Railway with PostgreSQL and Sarvam Gujarati/Hindi/English transcription. No credentials or patient records are committed to GitHub.
 
-## Open the workspaces
+## One unified clinic workspace
 
-- OPD manager: https://durva-clinic-production-production.up.railway.app/clinic
-- Voice patient registration and clinical scribe: https://durva-clinic-production-production.up.railway.app/
+- **Default console (all workflows):** https://durva-clinic-production-production.up.railway.app/
+- Alternative link to the same console: https://durva-clinic-production-production.up.railway.app/clinic
+- Previous unified interface (recovery only): https://durva-clinic-production-production.up.railway.app/classic
+- Older transcription screen (recovery only): https://durva-clinic-production-production.up.railway.app/legacy
 
-Both workspaces use the same authenticated clinic account and database.
+The default console combines patient lookup, consented multilingual voice registration, AI consultation dictation, doctor-controlled documentation, vitals, prescriptions, consultation billing, and follow-up scheduling without switching applications. It uses the **same authenticated account** and Railway database.
+
+The design prioritizes clinical speed over animation: primary actions are visually prominent; repetitive actions are short; signed medications require explicit clinician review. The five-minute workflow is a design target, not a clinical time limit or service guarantee.
 
 ## Daily clinic workflow
 
