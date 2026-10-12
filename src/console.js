@@ -84,7 +84,7 @@ function overlayHtml(){
   const people=S.patients.filter(x=>!S.search||String(x.name||"").toLowerCase().includes(S.search.toLowerCase())||String(x.phone||"").includes(S.search)).slice(0,12);
   body='<div class="flex between"><div><h2>Who are you seeing?</h2><p>Find an existing patient or register a new one by voice.</p></div>'+btn("✕","close","white circle")+'</div>'+
   '<div class="searchbox"><input aria-label="Search patient" data-field="search" placeholder="Name or mobile number" value="'+E(S.search)+'" autofocus></div>'+
-  '<div class="patient-list">'+people.map(p=>'<div class="patient-row">'+patientAvatar(p)+'<span class="info"><strong>'+E(p.name)+'</strong><small>'+E(p.age||"Age —")+' years · '+E(p.phone||"No mobile")+'</small></span>'+btn("Choose","choose-patient","white small",'data-id="'+E(p.id)+'"')+'</div>').join("")+
+  '<div class="patient-list">'+people.map(p=>'<div class="patient-row">'+patientAvatar(p)+'<span class="info"><strong>'+E(p.name)+'</strong><small>'+E(p.age||"Age —")+' years · '+E(p.phone||"No mobile")+'</small></span>'+'<span class="quick-actions">'+btn("Add to queue","queue-patient","soft small",'data-id="'+E(p.id)+'"')+btn("Choose","choose-patient","white small",'data-id="'+E(p.id)+'"')+'</span>'+'</div>').join("")+
   (!people.length?'<div class="empty">'+svgEmpty+'<strong>No matching patients</strong>Try another name or register a new patient.</div>':"")+'</div>'+
   '<hr class="sep">'+btn(icon("mic",16)+" Register new patient","open-register","soft full");
  }
@@ -147,7 +147,7 @@ function patients(){
  const search=S.search.toLowerCase().trim(),people=S.patients.filter(p=>!search||String(p.name||"").toLowerCase().includes(search)||String(p.phone||"").includes(search)||String(p.code||"").toLowerCase().includes(search)).slice(0,60);
  return '<div class="headline"><div><div class="head-eyebrow">Patient directory</div><h1>People, not paperwork.</h1><p class="head-sub">Find someone in seconds. Everything else follows.</p></div>'+btn(icon("mic",16)+" New patient","open-register","head-btn")+'</div>'+
  '<section class="panel"><div class="searchbox"><input data-field="search" value="'+E(S.search)+'" placeholder="Search by name, mobile or patient ID" aria-label="Search patient"></div>'+
- '<div class="patient-list">'+(people.length?people.map(p=>'<div class="patient-row">'+patientAvatar(p)+'<span class="info"><strong>'+E(p.name)+'</strong><small>'+E(p.code)+' · '+E(p.age||"—")+' yrs · '+E(p.phone||"No phone")+'</small></span>'+btn("Start visit","choose-patient","white small",'data-id="'+E(p.id)+'"')+'</div>').join(""):'<div class="empty">'+svgEmpty+'<strong>No patients found</strong>Try a different name or register a new patient.</div>')+'</div></section>';
+ '<div class="patient-list">'+(people.length?people.map(p=>'<div class="patient-row">'+patientAvatar(p)+'<span class="info"><strong>'+E(p.name)+'</strong><small>'+E(p.code)+' · '+E(p.age||"—")+' yrs · '+E(p.phone||"No phone")+'</small></span>'+'<span class="quick-actions">'+btn("Add to queue","queue-patient","soft small",'data-id="'+E(p.id)+'"')+btn("Start visit","choose-patient","white small",'data-id="'+E(p.id)+'"')+'</span>'+'</div>').join(""):'<div class="empty">'+svgEmpty+'<strong>No patients found</strong>Try a different name or register a new patient.</div>')+'</div></section>';
 }
 function followups(){
  return '<div class="headline"><div><div class="head-eyebrow">Continuity of care</div><h1>Never lose the thread.</h1><p class="head-sub">Patients who are due for a review.</p></div></div>'+
@@ -265,6 +265,13 @@ async function openPicker(){
 }
 function resetRegistration(){S.pd={name:"",age:"",phone:"",sex:"",address:"",allergies:""};S.consent=false;S.voiceJob=null;S.voiceTicket=null;S.voiceTranscript="";S.voiceUncertain="";S.audio=null;S.audioMime=null;}
 function openRegister(){resetRegistration();S.overlay="register";render();}
+async function queuePatient(id){
+ const current=await api("/api/opd/overview?date="+dateIST());
+ const exists=(current.entries||[]).find(x=>x.patientId===id&&["waiting","in_consultation"].includes(x.status));
+ if(exists){S.overlay=null;await loadHome();toast("Patient already in the queue.");return;}
+ await api("/api/opd/entries","POST",{patientId:id,reason:"Walk-in"});
+ S.overlay=null;await loadHome();toast("Patient checked in — now waiting.");
+}
 async function choosePatient(id){
  const r=await api("/api/opd/entries","POST",{patientId:id,reason:""});
  S.overlay=null;await openEntry(r.entry.id);
@@ -457,6 +464,8 @@ async function action(el){
  if(cmd==="open-register"){openRegister();return;}
  if(cmd==="close"){S.overlay=null;render();return;}
  if(cmd==="choose-patient"){await choosePatient(el.dataset.id);return;}
+ if(cmd==="queue-patient"){await queuePatient(el.dataset.id);return;}
+ if(cmd==="show-queue"){await loadHome();document.getElementById("today-queue")?.scrollIntoView({block:"start",behavior:"auto"});return;}
  if(cmd==="register-patient"){await registerAndStart();return;}
  if(cmd==="open-entry"){await openEntry(el.dataset.id);return;}
  if(cmd==="begin-consult"){await beginConsultation();return;}
@@ -490,8 +499,8 @@ document.addEventListener("click",e=>{
 document.addEventListener("input",e=>{
  const el=e.target,key=el?.dataset?.field;if(!key)return;
  const value=el.value;
- if(key==="search"){S.search=value;const focused=el;const pos=el.selectionStart;const nearest=el.closest(".overlay");if(nearest?.querySelector(".patient-list")){const list=nearest.querySelector(".patient-list");list.innerHTML=S.patients.filter(x=>!value||String(x.name||"").toLowerCase().includes(value.toLowerCase())||String(x.phone||"").includes(value)).slice(0,12).map(p=>'<div class="patient-row">'+patientAvatar(p)+'<span class="info"><strong>'+E(p.name)+'</strong><small>'+E(p.phone||"")+'</small></span>'+btn("Choose","choose-patient","white small",'data-id="'+E(p.id)+'"')+'</div>').join("")||'<div class="empty">No patients found.</div>';}
- else if(S.page==="patients"){const parent=document.querySelector(".patient-list");if(parent)parent.innerHTML=S.patients.filter(x=>!value||String(x.name||"").toLowerCase().includes(value.toLowerCase())||String(x.phone||"").includes(value)).slice(0,70).map(p=>'<div class="patient-row">'+patientAvatar(p)+'<span class="info"><strong>'+E(p.name)+'</strong><small>'+E(p.phone||"")+'</small></span>'+btn("Start visit","choose-patient","white small",'data-id="'+E(p.id)+'"')+'</div>').join("")||'<div class="empty">No patients found.</div>';}return;}
+ if(key==="search"){S.search=value;const focused=el;const pos=el.selectionStart;const nearest=el.closest(".overlay");if(nearest?.querySelector(".patient-list")){const list=nearest.querySelector(".patient-list");list.innerHTML=S.patients.filter(x=>!value||String(x.name||"").toLowerCase().includes(value.toLowerCase())||String(x.phone||"").includes(value)).slice(0,12).map(p=>'<div class="patient-row">'+patientAvatar(p)+'<span class="info"><strong>'+E(p.name)+'</strong><small>'+E(p.phone||"")+'</small></span>'+'<span class="quick-actions">'+btn("Add to queue","queue-patient","soft small",'data-id="'+E(p.id)+'"')+btn("Choose","choose-patient","white small",'data-id="'+E(p.id)+'"')+'</span>'+'</div>').join("")||'<div class="empty">No patients found.</div>';}
+ else if(S.page==="patients"){const parent=document.querySelector(".patient-list");if(parent)parent.innerHTML=S.patients.filter(x=>!value||String(x.name||"").toLowerCase().includes(value.toLowerCase())||String(x.phone||"").includes(value)).slice(0,70).map(p=>'<div class="patient-row">'+patientAvatar(p)+'<span class="info"><strong>'+E(p.name)+'</strong><small>'+E(p.phone||"")+'</small></span>'+'<span class="quick-actions">'+btn("Add to queue","queue-patient","soft small",'data-id="'+E(p.id)+'"')+btn("Start visit","choose-patient","white small",'data-id="'+E(p.id)+'"')+'</span>'+'</div>').join("")||'<div class="empty">No patients found.</div>';}return;}
  const parts=key.split(".");
  if(parts[0]==="pd")S.pd[parts[1]]=value;
  else if(parts[0]==="profile")S.profile[parts[1]]=value;
