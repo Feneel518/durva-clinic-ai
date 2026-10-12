@@ -7,7 +7,7 @@ async function check(path:string,body:any,label:string){
  console.log(label+": OK");
  return data;
 }
-const chat=await check("/v1/chat/completions",{model:"sarvam-105b",messages:[{role:"user",content:"Reply ONLY with the word READY."}],max_tokens:100,temperature:0},"Sarvam clinical-note model");
+const chat=await check("/v1/chat/completions",{model:"sarvam-105b",messages:[{role:"user",content:"Reply ONLY with the word READY."}],max_tokens:256,temperature:0,reasoning_effort:null},"Sarvam clinical-note model");
 if(!chat?.choices?.[0]?.message?.content)throw Error("Sarvam chat response empty");
 const job=await check("/speech-to-text/job/v1",{job_parameters:{model:"saaras:v4",mode:"transcribe",with_diarization:true,num_speakers:2}},"Sarvam transcription batch job creation");
 if(!job?.job_id)throw Error("Sarvam transcription returned no job reference");
