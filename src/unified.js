@@ -43,6 +43,8 @@ async function init(){
   S.profile=(await api("/api/opd/profile")).profile;
   await loadFavorites();await loadFollowups();
   const u=new URL(location.href),patientId=u.searchParams.get("patient"),entryId=u.searchParams.get("entry");
+  if(u.searchParams.has("visit")){location.replace("/legacy?visit="+encodeURIComponent(u.searchParams.get("visit")||""));return;}
+  if(u.searchParams.has("newPatient")){newRegister();return;}
   if(entryId&&/^[a-f0-9-]{36}$/.test(entryId))await openEntry(entryId);
   else if(patientId&&/^[a-f0-9-]{36}$/.test(patientId))await newEncounter(patientId);
   else await goto("today");
