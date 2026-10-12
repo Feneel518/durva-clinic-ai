@@ -42,7 +42,7 @@ if(path==="/app.js"&&method==="GET")return new Response(CLIENT,{headers:{"Conten
 if(method==="GET"&&(path==="/clinic"||path==="/clinic/"||path==="/clinic.js"||path==="/clinic.css")){
  const resource=path==="/clinic"||path==="/clinic/"?"clinic.html":path==="/clinic.js"?"clinic-browser.js":"clinic.css";
  const mime=resource.endsWith(".html")?"text/html":resource.endsWith(".js")?"text/javascript":"text/css";
- return new Response(Bun.file(new URL("./"+resource,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+ return new Response(Bun.file(new URL("./"+resource,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 }
 if(!path.startsWith("/api/"))return err("Not found",404);
 await initPromise;if(!dbReady)return err("Database not ready",503);
