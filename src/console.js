@@ -111,6 +111,23 @@ function overlayHtml(){
   '<div class="dialog-footer">'+btn("Go back","close","white")+btn("Complete visit","finish-confirm","green")+'</div>'+
   '<p class="micro muted" style="margin:9px 0 0">If processing is interrupted, saved steps remain in the encounter. The system won’t duplicate an existing bill.</p>';
  }
+ if(S.overlay==="catalog-add"){
+  body='<div class="flex between"><div><h2>Add medicine to your clinic</h2><p>Only medicines actually held by the clinic should be available to prescribe.</p></div>'+btn("✕","close","white circle")+'</div>'+
+  '<div class="form-grid">'+field("Medicine name *","catalog.name",S.catalogDraft?.name||"","Medicine/brand name")+
+  field("Strength *","catalog.strength",S.catalogDraft?.strength||"","e.g. 500 mg")+
+  field("Formulation *","catalog.form",S.catalogDraft?.form||"","Tablet / syrup / drops")+
+  field("Route *","catalog.route",S.catalogDraft?.route||"","Oral / topical")+
+  field("Spoken aliases","catalog.aliases",S.catalogDraft?.aliases||"","Comma-separated alternate names")+
+  field("Available quantity (optional)","catalog.stock",S.catalogDraft?.stock??"","Leave blank if not tracked","number")+
+  '</div><div class="dialog-footer">'+btn("Cancel","close","white")+btn("Save clinic medicine","save-catalog")+'</div>';
+ }
+ if(S.overlay==="catalog-picker"){
+  const available=(S.catalog||[]).filter(x=>x.active!==false&&x.stock!==0);
+  body='<div class="flex between"><div><h2>Clinic medicines</h2><p>Choose an available medicine; verify strength and enter spoken directions.</p></div>'+btn("✕","close","white circle")+'</div>'+
+  (available.length?'<div class="patient-list">'+available.map(x=>'<div class="patient-row"><span class="icon-dot">'+icon("file",16)+'</span><span class="info"><strong>'+E(x.name)+' · '+E(x.strength)+'</strong><small>'+E(x.form)+' · '+E(x.route)+(x.stock!==null?' · '+E(x.stock)+' available':'')+'</small></span>'+btn("Select","select-catalog","white small",'data-id="'+E(x.id)+'"')+'</div>').join("")+'</div>':
+  '<div class="empty">Add your actual clinic medicines under More first.</div>')+
+  '<div class="dialog-footer">'+btn("Close","close","white")+btn("Add to catalog","new-catalog")+'</div>';
+ }
  if(S.overlay==="favorite"){
   const m=S.favoriteDraft||emptyMed();
   body='<div class="flex between"><div><h2>Save medicine favorite</h2><p>Doctor-defined template only; never automatically prescribed.</p></div>'+btn("✕","close","white circle")+'</div>'+
@@ -161,8 +178,8 @@ function more(){
  field("Clinic name","profile.clinicName",p.clinicName)+field("Doctor’s name","profile.clinicianName",p.clinicianName)+field("Medical registration number","profile.registrationNumber",p.registrationNumber)+field("Clinic phone","profile.phone",p.phone)+
  field("Default visit fee (₹)","profile.consultationFee",p.consultationFee,"300")+field("Clinic address","profile.address",p.address)+
  '</div><div class="sticky-actions">'+btn("Save clinic details","save-profile")+'</div></section>'+
- '<section class="panel"><div class="panel-header"><h2>Medicine shortcuts</h2>'+btn(icon("plus",14)+" Add favorite","new-favorite","white small")+'</div><p class="caption">Only your own medicines and dosing instructions appear here. Shortcuts never sign or prescribe without your review.</p>'+
- (fav.medicines.length?fav.medicines.map((m,i)=>'<div class="patient-row"><span class="icon-dot">'+icon("file",16)+'</span><span class="info"><strong>'+E(m.name)+' '+E(m.strength)+'</strong><small>'+E([m.route,m.frequency,m.duration].filter(Boolean).join(" · "))+'</small></span>'+btn("Remove","remove-favorite","white small",'data-index="'+i+'"')+'</div>').join(""):'<div class="empty" style="padding:20px">Add a medicine you commonly prescribe with its exact details.</div>')+'</section></div>'+
+ '<section class="panel"><div class="panel-header"><h2>Medicines in your clinic</h2>'+btn(icon("plus",14)+" Add medicine","new-catalog","white small")+'</div><p class="caption">This is your clinic stock list. Only these available formulations can be selected or matched from speech.</p>'+
+ ((S.catalog||[]).length?(S.catalog||[]).map(x=>'<div class="patient-row"><span class="icon-dot">'+icon("file",16)+'</span><span class="info"><strong>'+E(x.name)+' · '+E(x.strength)+'</strong><small>'+E(x.form)+' · '+E(x.route)+(x.stock!==null?' · '+E(x.stock)+' available':'')+'</small></span><span class="med-tag '+(x.active!==false?'verified':'caution')+'">'+(x.active!==false?'Active':'Inactive')+'</span>'+(x.active!==false?btn("Deactivate","disable-catalog","white small",'data-id="'+E(x.id)+'"'):"")+'</div>').join(""):'<div class="empty" style="padding:20px">No medicines in the clinic catalog yet. Add products actually stocked.</div>')+'</section></div>'+
  '<div><section class="panel"><div class="panel-header"><h2>Practice overview</h2></div>'+
  (r?'<div class="quick-summary"><dl><dt>Visits today</dt><dd>'+Object.values(r.visits||{}).reduce((a,b)=>a+Number(b),0)+'</dd><dt>Billed</dt><dd>'+money(r.billedPaise)+'</dd><dt>Payments</dt><dd>'+money(Object.values(r.payments||{}).reduce((a,b)=>a+Number(b),0))+'</dd></dl></div>':'<p class="caption">View your current-day OPD and receipts.</p>')+
  '<div class="sticky-actions">'+btn("Refresh overview","load-reports","white")+'</div></section>'+
@@ -217,8 +234,10 @@ function visitView(){
  '</div><details class="details"><summary>Other vitals & clinical history</summary><div class="form-grid" style="margin-top:13px">'+field("Height (cm)","ass.heightCm",a.heightCm,"cm","number")+field("Glucose (mg/dL)","ass.glucoseMgDl",a.glucoseMgDl,"mg/dL","number")+field("Respiratory rate","ass.respRate",a.respRate,"/min","number")+area("History","ass.history",a.history)+area("Examination","ass.examination",a.examination)+area("Allergies","ass.allergies",a.allergies)+'</div></details></details></section>'+
  '<section class="panel"><div class="step-head"><h2><span class="num">3</span> Prescription</h2><small>'+(hasSavedRx?"Signed":"Doctor reviewed")+'</small></div>'+
  (hasSavedRx?'<div class="note good">Prescription signed and locked. It cannot be edited.</div><a class="btn white" target="_blank" rel="noopener" href="/api/opd/entries/'+E(e.id)+'/prescription/print">'+icon("print",15)+' Print prescription</a>':
- '<div><p class="caption">Choose your own favorites or enter the medicines yourself. The software never recommends medicine or doses.</p>'+
- (S.favorites.medicines?.length?'<div class="pill-row" style="margin:13px 0">'+S.favorites.medicines.slice(0,12).map((m,i)=>'<button class="pill" data-action="use-favorite" data-index="'+i+'">+ '+E(m.name)+' '+E(m.strength)+'</button>').join("")+'</div>':"")+
+ '<div><p class="caption">Only medicines in your clinic catalog can be added. Dosing and timing remain doctor-reviewed drafts.</p>'+
+ ((S.catalog||[]).some(x=>x.active!==false&&x.stock!==0)?'<div class="pill-row" style="margin:13px 0">'+S.catalog.filter(x=>x.active!==false&&x.stock!==0).slice(0,8).map(x=>'<button class="pill" data-action="select-catalog" data-id="'+E(x.id)+'">+ '+E(x.name)+' '+E(x.strength)+'</button>').join("")+'</div>':'<div class="note">No medicines available yet. Add the medicines you stock under More → Medicines in your clinic.</div>')+
+ ((S.voiceOrders?.unmatched||[]).length?'<div class="note warn"><strong>Voice details requiring clarification</strong><br>'+S.voiceOrders.unmatched.map(x=>E(x.spokenName||"Unclear medicine")+': '+E(x.reason)).join('<br>')+'</div>':'')+
+ ((S.voiceOrders?.accepted||[]).length?'<div class="note good">Catalog-matched voice draft: '+S.voiceOrders.accepted.length+' medicine(s). Verify everything before signing.</div>':'')+
  '<div class="form-grid">'+area("Working diagnosis","rx.diagnosis",rx.diagnosis,"Your clinical impression")+area("Investigations","rx.investigations",rx.investigations,"Tests if required")+'</div>'+
  '<div class="section-head"><h2>Medicines</h2>'+btn(icon("plus",14)+" Add medicine","add-med","white small")+'</div>'+
  (rx.medicines.map(rxMedicine).join("")||'<div class="note">No medicines added. You can complete a consultation without prescribing.</div>')+
