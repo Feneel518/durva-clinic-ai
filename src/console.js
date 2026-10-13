@@ -370,9 +370,11 @@ async function beginAudio(kind){
  if(kind==="registration"&&!S.consent)throw Error("Confirm the patient’s consent before recording.");
  if(kind==="consultation"&&!S.draft.consultConsent&&!S.visit?.consentAt)throw Error("Confirm patient consent before recording the consultation.");
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw Error("Microphone recording is unavailable in this browser.");
- if(kind==="consultation"&&!S.visit){await beginConsultation();if(!S.visit)throw Error("Begin this consultation before recording.");}
- if(kind==="consultation"&&!S.visit?.consentAt){const c=await api("/api/visit/"+S.visit.id+"/consent","POST",{consent:true});S.visit=c.visit;}
  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+ try{
+  if(kind==="consultation"&&!S.visit){await beginConsultation();if(!S.visit)throw Error("Unable to start consultation.");}
+  if(kind==="consultation"&&!S.visit?.consentAt){const c=await api("/api/visit/"+S.visit.id+"/consent","POST",{consent:true});S.visit=c.visit;}
+ }catch(e){stream.getTracks().forEach(x=>x.stop());throw e;}
  const type=chooseAudioType();if(!type){stream.getTracks().forEach(x=>x.stop());throw Error("Your browser does not support a compatible recording format.");}
  const mr=new MediaRecorder(stream,{mimeType:type,audioBitsPerSecond:48000}),chunks=[];
  S.recording=mr;S.recordKind=kind;S.audioMime=type.split(";")[0];S.voiceJob=null;
