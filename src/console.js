@@ -194,21 +194,27 @@ function visitView(){
  (canEdit?btn(icon("check",17)+" Review & complete","review-visit","green"):btn("View completed visit","noop","soft"))+'</div>'+
  '<div class="progress">'+[["Patient",0],["Consultation",1],["Review",2],["Done",3]].map((x,i)=>'<div class="progress-step '+(currentStep>x[1]?"done":currentStep===x[1]?"current":"")+'"><span>'+(currentStep>x[1]?"✓":i+1)+'</span>'+x[0]+'</div>').join("")+'</div>'+
  '<div class="visit-columns"><div class="visit-main">'+
- (e.status==="scheduled"||e.status==="waiting"?'<section class="panel"><h2>Ready to begin?</h2><p class="caption">Open the consultation to create a linked note for this visit.</p>'+btn("Begin consultation","begin-consult")+'</section>':"")+
- '<section class="panel"><div class="step-head"><h2><span class="num">1</span> Listen & document</h2><small>Voice-first</small></div>'+
- '<div class="form-grid">'+area("Chief complaint","note.chiefComplaint",n.chiefComplaint,"What brings the patient here?")+area("Assessment","note.assessment",n.assessment,"Clinician’s assessment")+area("History of present illness","note.historyOfPresentIllness",n.historyOfPresentIllness,"Symptoms and duration")+area("Treatment plan","note.plan",n.plan,"Clinical plan")+'</div>'+
- '<div class="recorder"><div class="flex between wrap"><div class="flex"><span class="record-dot '+(S.recording?.state==="recording"&&S.recordKind==="consultation"?"active":"")+'"></span><div><div class="rec-title">'+(S.recording?.state==="recording"&&S.recordKind==="consultation"?"Recording conversation…":S.voiceJob?"Sarvam is preparing the note…":vst?.transcript?"AI draft available":"Record the conversation")+'</div><div class="rec-sub">Gujarati, Hindi & English. The doctor reviews all AI findings.</div></div></div>'+
- (S.recording?.state==="recording"&&S.recordKind==="consultation"?btn("■ Stop","stop-record","white small"):S.voiceJob?btn("Check status","poll-consult","white small"):btn(icon("mic",16)+" Record","record-consult","white small",canEdit?"":"disabled"))+
- '</div><label class="checkbox" style="margin-top:15px"><input type="checkbox" data-check="consultConsent" '+(d.consultConsent||vst?.consentAt?"checked":"")+'>Patient consents to this consultation recording and Sarvam AI processing.</label></div>'+
- (vst?.transcript?'<details class="details"><summary>Read the source transcription</summary><p class="small muted" style="white-space:pre-wrap;line-height:1.75">'+E(vst.transcript.slice(0,20000))+'</p></details>':"")+
+ '<section class="panel voice-first"><div class="step-head"><h2>Voice consultation</h2><small>Speak first, review after</small></div>'+
+ '<div class="voice-intro"><div class="voice-orb">'+icon("mic",26)+'</div><div><h3>'+(S.recording?.state==="recording"&&S.recordKind==="consultation"?"Recording your consultation…":S.voiceJob?"Converting speech to notes…":vst?.transcript?"Voice draft ready for your review":"Everything starts with your voice")+'</h3><p>Speak with the patient naturally in Gujarati, Hindi or English. Clinical notes and catalog-matched medicines will be prepared for review.</p></div></div>'+
+ '<div class="voice-cta">'+
+ (S.recording?.state==="recording"&&S.recordKind==="consultation"?btn("■ Stop recording","stop-record","voice-primary"):
+ S.voiceJob?btn("↻ Check transcription","poll-consult","voice-primary"):
+ btn(icon("mic",19)+(vst?.transcript?" Record again":" Start recording"),"record-consult","voice-primary",canEdit?"":"disabled"))+
+ '</div><label class="checkbox voice-consent"><input type="checkbox" data-check="consultConsent" '+(d.consultConsent||vst?.consentAt?"checked":"")+'>Patient consents to recording and Sarvam AI processing.</label>'+
+ (vst?.transcript?'<div class="note good">Transcription received. Please review the AI draft and any proposed medicines below.</div><details class="details"><summary>Source transcript</summary><p class="small muted" style="white-space:pre-wrap;line-height:1.75">'+E(vst.transcript.slice(0,20000))+'</p></details>':'')+
+ '<details class="details" '+(S.showClinical||vst?.transcript?'open':'')+'><summary>Review clinical note · AI-generated, doctor-approved</summary><div class="form-grid" style="margin-top:15px">'+
+ area("Chief complaint","note.chiefComplaint",n.chiefComplaint,"Doctor/patient speech")+
+ area("Assessment","note.assessment",n.assessment,"Doctor statement only")+
+ area("History of present illness","note.historyOfPresentIllness",n.historyOfPresentIllness,"Symptoms and duration")+
+ area("Treatment plan","note.plan",n.plan,"Doctor statement only")+'</div></details>'+
  '<details class="details"><summary>More note fields (examination, medicines and follow-up)</summary><div class="form-grid" style="margin-top:13px">'+
  area("Past medical history","note.pastHistory",n.pastHistory)+area("Examination findings","note.examination",n.examination)+area("Medicines in note","note.medications",n.medications)+area("Follow-up note","note.followUp",n.followUp)+area("Uncertainties to verify","note.uncertainties",n.uncertainties)+'</div></details></section>'+
- '<section class="panel"><div class="step-head"><h2><span class="num">2</span> Vitals & examination</h2><small>As measured</small></div>'+
+ '<section class="panel understated"><details class="details"><summary>Vitals & examination · only if measured</summary>'+
  '<div class="form-grid">'+
  field("Blood pressure · systolic","ass.systolic",a.systolic,"mmHg","number")+field("Diastolic","ass.diastolic",a.diastolic,"mmHg","number")+
  field("Pulse","ass.pulse",a.pulse,"/min","number")+field("SpO₂","ass.spo2",a.spo2,"%","number")+
  field("Temperature °C","ass.tempC",a.tempC,"°C","number")+field("Weight kg","ass.weightKg",a.weightKg,"kg","number")+
- '</div><details class="details"><summary>Other vitals & clinical history</summary><div class="form-grid" style="margin-top:13px">'+field("Height (cm)","ass.heightCm",a.heightCm,"cm","number")+field("Glucose (mg/dL)","ass.glucoseMgDl",a.glucoseMgDl,"mg/dL","number")+field("Respiratory rate","ass.respRate",a.respRate,"/min","number")+area("History","ass.history",a.history)+area("Examination","ass.examination",a.examination)+area("Allergies","ass.allergies",a.allergies)+'</div></details></section>'+
+ '</div><details class="details"><summary>Other vitals & clinical history</summary><div class="form-grid" style="margin-top:13px">'+field("Height (cm)","ass.heightCm",a.heightCm,"cm","number")+field("Glucose (mg/dL)","ass.glucoseMgDl",a.glucoseMgDl,"mg/dL","number")+field("Respiratory rate","ass.respRate",a.respRate,"/min","number")+area("History","ass.history",a.history)+area("Examination","ass.examination",a.examination)+area("Allergies","ass.allergies",a.allergies)+'</div></details></details></section>'+
  '<section class="panel"><div class="step-head"><h2><span class="num">3</span> Prescription</h2><small>'+(hasSavedRx?"Signed":"Doctor reviewed")+'</small></div>'+
  (hasSavedRx?'<div class="note good">Prescription signed and locked. It cannot be edited.</div><a class="btn white" target="_blank" rel="noopener" href="/api/opd/entries/'+E(e.id)+'/prescription/print">'+icon("print",15)+' Print prescription</a>':
  '<div><p class="caption">Choose your own favorites or enter the medicines yourself. The software never recommends medicine or doses.</p>'+
