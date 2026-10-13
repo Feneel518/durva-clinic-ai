@@ -437,8 +437,8 @@ function previewReview(){
  if(["completed","cancelled","no_show"].includes(S.entry.status))throw Error("This consultation is closed.");
  if(!String(d.note.chiefComplaint||d.ass.complaint||"").trim())throw Error("Add the patient’s chief complaint before completing.");
  if(!String(d.note.assessment||d.ass.assessment||"").trim())throw Error("Add the doctor’s assessment before completing.");
- if(d.rx.medicines.some(m=>!m.name?.trim()))throw Error("Remove incomplete medicine rows or fill the medicine name.");
- if(d.rx.medicines.some(m=>m.name?.trim()&&(!m.strength?.trim()||!m.route?.trim()||!m.frequency?.trim()||!m.duration?.trim())))throw Error("Each prescribed medicine needs strength, route, frequency and duration before signing.");
+ if(d.rx.medicines.some(m=>!m.catalogId||!S.catalog.some(x=>x.id===m.catalogId&&x.active!==false&&x.stock!==0)))throw Error("Choose each medicine from your active clinic medicine catalog.");
+ if(d.rx.medicines.some(m=>m.name?.trim()&&(!m.strength?.trim()||!m.route?.trim()||!m.dose?.trim()||!m.frequency?.trim()||!m.duration?.trim())))throw Error("Each prescribed medicine needs clinician-verified dose, strength, route, frequency and duration before signing.");
  const fee=String(d.charge||"").trim();if(!/^\d{1,7}(\.\d{1,2})?$/.test(fee)||Number(fee)<=0)throw Error("Enter a valid consultation fee.");
  S.overlay="review";render();
 }
@@ -516,6 +516,38 @@ async function action(el){
  if(cmd==="stop-record"){S.recording?.stop();return;}
  if(cmd==="poll-register"){await pollRegistration();return;}
  if(cmd==="poll-consult"){await pollConsultation();return;}
+ if(cmd==="new-catalog"){S.catalogDraft={name:"",strength:"",form:"",route:"",aliases:"",stock:""};S.overlay="catalog-add";render();return;}
+ if(cmd==="save-catalog"){
+  const d=S.catalogDraft||{};
+  const med=await api("/api/clinic/medicines","POST",{...d,aliases:String(d.aliases||"").split(",").map(x=>x.trim()).filter(Boolean)});
+  S.catalog=[med.medicine,...S.catalog];S.overlay=null;render();toast("Medicine added to your clinic catalog.");return;
+ }
+ if(cmd==="disable-catalog"){
+  if(!confirm("Deactivate this medicine? It will no longer appear in new prescriptions."))return;
+  await api("/api/clinic/medicines/"+el.dataset.id,"DELETE");
+  const r=await api("/api/clinic/medicines");S.catalog=r.medicines;render();return;
+ }
+ if(cmd==="select-catalog"){
+  if(!S.entry||!S.draft)return toast("Open a consultation to select medicine.");
+  const m=S.catalog.find(x=>x.id===el.dataset.id&&x.active!==false&&x.stock!==0);
+  if(!m)return toast("Medicine unavailable. Refresh the catalog.");
+  if(S.draft.rx.medicines.some(x=>x.catalogId===m.id))return toast("This medicine is already in the prescription.");
+  S.draft.rx.medicines.push({catalogId:m.id,name:m.name,strength:m.strength,form:m.form,route:m.route,dose:"",frequency:"",duration:"",timingTokens:[],mealTiming:"none",instructions:""});
+  S.overlay=null;render();toast("Medicine selected. Enter the exact doctor-prescribed directions.");return;
+ }
+ if(cmd==="timing-tag"){
+  const med=S.draft?.rx?.medicines?.[Number(el.dataset.index)];if(!med)return;
+  const token=el.dataset.token,valid=["morning","afternoon","evening","night","bedtime","as_needed"];
+  if(!valid.includes(token))return;
+  const arr=Array.isArray(med.timingTokens)?med.timingTokens:[];
+  med.timingTokens=arr.includes(token)?arr.filter(x=>x!==token):[...arr,token];
+  render();return;
+ }
+ if(cmd==="meal-tag"){
+  const med=S.draft?.rx?.medicines?.[Number(el.dataset.index)];if(!med)return;
+  const meal=el.dataset.meal;if(!["none","before_food","after_food","with_food"].includes(meal))return;
+  med.mealTiming=meal;render();return;
+ }
  if(cmd==="add-med"){S.overlay="catalog-picker";render();return;}
  if(cmd==="remove-med"){S.draft.rx.medicines.splice(Number(el.dataset.index),1);render();return;}
  if(cmd==="use-favorite"){toast("Only medicines in your clinic catalog can be prescribed. Open the catalog to choose.");S.overlay="catalog-picker";render();return;}
@@ -547,6 +579,7 @@ document.addEventListener("input",e=>{
  if(parts[0]==="pd")S.pd[parts[1]]=value;
  else if(parts[0]==="profile")S.profile[parts[1]]=value;
  else if(parts[0]==="fav")S.favoriteDraft[parts[1]]=value;
+ else if(parts[0]==="catalog")S.catalogDraft[parts[1]]=value;
  else if(parts[0]==="note")S.draft.note[parts[1]]=value;
  else if(parts[0]==="ass")S.draft.ass[parts[1]]=value;
  else if(parts[0]==="rx")S.draft.rx[parts[1]]=value;
