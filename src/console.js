@@ -21,7 +21,7 @@ const emptyAss=()=>({systolic:"",diastolic:"",pulse:"",tempC:"",spo2:"",weightKg
 const emptyMed=()=>({name:"",strength:"",route:"",frequency:"",duration:"",instructions:""});
 const freshRx=()=>({diagnosis:"",advice:"",investigations:"",medicines:[]});
 const dateIST=()=>new Date(Date.now()+19800000).toISOString().slice(0,10);
-const S={auth:false,user:null,page:"today",overlay:null,ready:false,profile:null,overview:null,patients:[],followups:[],reports:null,entry:null,visit:null,history:[],patient:null,favorites:{medicines:[],complaints:[]},draft:null,pd:{name:"",age:"",phone:"",sex:"",address:"",allergies:""},consent:false,recording:null,audio:null,audioMime:null,recordKind:null,voiceJob:null,voiceTicket:null,voiceTranscript:"",voiceUncertain:"",busy:false,loadedAt:0,search:"",searchDelay:null,lastVoiceError:""};
+const S={auth:false,user:null,page:"today",overlay:null,ready:false,profile:null,overview:null,patients:[],followups:[],reports:null,entry:null,visit:null,history:[],patient:null,favorites:{medicines:[],complaints:[]},draft:null,pd:{name:"",age:"",phone:"",sex:"",address:"",allergies:""},consent:false,recording:null,audio:null,audioMime:null,recordKind:null,voiceJob:null,voiceTicket:null,voiceTranscript:"",voiceUncertain:"",busy:false,loadedAt:0,search:"",searchDelay:null,lastVoiceError:"",catalog:[],voiceOrders:null,showClinical:false};
 function E(t){return String(t??"").replace(/[&<>"']/g,k=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[k]));}
 const money=p=>"₹"+(Number(p||0)/100).toLocaleString("en-IN",{minimumFractionDigits:0,maximumFractionDigits:2});
 const dateLabel=d=>new Date(d+"T00:00:00+05:30").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
@@ -238,8 +238,8 @@ function render(){
 async function bootstrap(){
  try{
   const x=await api("/api/me");S.auth=true;S.user=x.user;
-  const [profile,favs]=await Promise.all([api("/api/opd/profile"),api("/api/console/favorites")]);
-  S.profile=profile.profile;S.favorites=favs.favorites;
+  const [profile,favs,meds]=await Promise.all([api("/api/opd/profile"),api("/api/console/favorites"),api("/api/clinic/medicines")]);
+  S.profile=profile.profile;S.favorites=favs.favorites;S.catalog=meds.medicines;
   const id=new URLSearchParams(location.search).get("visit");
   if(id&&/^[a-f0-9-]{36}$/.test(id)){
    const rows=(await api("/api/opd/overview?date="+dateIST())).entries;
@@ -257,7 +257,7 @@ async function loadHome(){
 async function loadPatients(){S.entry=null;S.visit=null;S.draft=null;S.page="patients";const r=await api("/api/opd/patients");S.patients=r.patients;render();}
 async function navigate(to){S.overlay=null;if(to==="today"){await loadHome();return;}if(to==="patients"){await loadPatients();return;}S.entry=null;S.visit=null;S.draft=null;S.page=to;
  if(to==="followups")S.followups=(await api("/api/opd/followups")).followups;
- if(to==="more"){const [p,f]=await Promise.all([api("/api/opd/profile"),api("/api/console/favorites")]);S.profile=p.profile;S.favorites=f.favorites;}
+ if(to==="more"){const [p,f,m]=await Promise.all([api("/api/opd/profile"),api("/api/console/favorites"),api("/api/clinic/medicines")]);S.profile=p.profile;S.favorites=f.favorites;S.catalog=m.medicines;}
  render();
 }
 async function openPicker(){
@@ -286,6 +286,8 @@ async function openEntry(id,retain=false){
  S.entry=e;S.visit=v;S.page="consult";S.overlay=null;
  if(!retain||!S.draft)S.draft=emptyDraft(e,v);
  if(v?.status==="approved")S.draft.note={...v.note};
+ S.voiceOrders=null;
+ if(e.visitId){try{S.voiceOrders=await api("/api/opd/entries/"+e.id+"/voice-orders");}catch{S.voiceOrders=null;}}
  if(e.followup?.dueDate){const ms=Date.parse(e.followup.dueDate+"T00:00:00+05:30")-Date.parse(dateIST()+"T00:00:00+05:30");S.draft.followDays=Math.max(0,Math.round(ms/86400000));}
  render();window.scrollTo({top:0,behavior:"instant"});
 }
@@ -380,7 +382,14 @@ async function pollConsultation(){
  for(let i=0;i<72;i++){
   const r=await api("/api/visit/"+id+"/status");
   if(r.state==="completed"){
-   S.visit=r.visit;S.draft.note={...emptyNote(),...r.visit.note};S.voiceJob=null;S.audio=null;render();toast("AI draft ready. Review every clinical detail.");return;
+   S.visit=r.visit;S.draft.note={...emptyNote(),...r.visit.note};S.voiceJob=null;S.audio=null;
+   try{
+    S.voiceOrders=await api("/api/opd/entries/"+S.entry.id+"/voice-orders");
+    const accepted=S.voiceOrders.accepted||[];
+    const already=new Set(S.draft.rx.medicines.map(m=>m.catalogId).filter(Boolean));
+    for(const m of accepted){if(!already.has(m.catalogId)){S.draft.rx.medicines.push({...m});already.add(m.catalogId);}}
+   }catch{S.voiceOrders={accepted:[],unmatched:[],warnings:["Medicine suggestions unavailable; choose catalog medicines manually."]};}
+   render();toast("Voice notes ready. Verify any matched medicines and directions.");return;
   }
   if(r.state==="failed"){S.voiceJob=null;render();throw Error("AI transcription failed. Please record again.");}
   if(r.state==="idle"){S.voiceJob=null;render();return;}
@@ -474,9 +483,9 @@ async function action(el){
  if(cmd==="stop-record"){S.recording?.stop();return;}
  if(cmd==="poll-register"){await pollRegistration();return;}
  if(cmd==="poll-consult"){await pollConsultation();return;}
- if(cmd==="add-med"){S.draft.rx.medicines.push(emptyMed());render();return;}
+ if(cmd==="add-med"){S.overlay="catalog-picker";render();return;}
  if(cmd==="remove-med"){S.draft.rx.medicines.splice(Number(el.dataset.index),1);render();return;}
- if(cmd==="use-favorite"){const m=S.favorites.medicines[Number(el.dataset.index)];if(m){S.draft.rx.medicines.push({...m});render();toast("Added for clinician review.");}return;}
+ if(cmd==="use-favorite"){toast("Only medicines in your clinic catalog can be prescribed. Open the catalog to choose.");S.overlay="catalog-picker";render();return;}
  if(cmd==="follow-day"){S.draft.followDays=Number(el.dataset.days);render();return;}
  if(cmd==="pay-mode"){S.draft.payMode=el.dataset.mode;render();return;}
  if(cmd==="save-draft"){await saveDraft();return;}
