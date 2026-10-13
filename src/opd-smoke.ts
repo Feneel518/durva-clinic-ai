@@ -34,6 +34,7 @@ try{
  await check("/console.css",200,".hero-main","text/css");
  await check("/console-polish.css",200,".waiting-live","text/css");
  await check("/api/console/favorites",401,"Sign in required","application/json");
+ await check("/api/clinic/medicines",401,"Sign in required","application/json");
  await check("/api/opd/overview",401,"Sign in required","application/json");
  await check("/api/me",401,"Sign in required","application/json");
  await check("/",200,"Durva","text/html");
@@ -42,6 +43,9 @@ try{
   const r=await db.unsafe("SELECT COUNT(*)::int AS n FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('clinic_opd_entries','clinic_opd_assessments','clinic_opd_prescriptions','clinic_opd_bills','clinic_opd_payments','clinic_opd_followups','clinic_opd_profile','clinic_opd_audit')");
   if(Number(r[0]?.n)!==8)throw Error("OPD database migrations incomplete");
   console.log("OPD schema OK: all eight tables present");
+  const extra=await db.unsafe("SELECT COUNT(*)::int AS n FROM information_schema.tables WHERE table_schema=\'public\' AND table_name IN (\'clinic_medicine_catalog\',\'clinic_voice_med_drafts\')");
+  if(Number(extra[0]?.n)!==2)throw Error("Medicine catalog migrations incomplete");
+  console.log("Voice medicine catalog schema OK");
   const fav=await db.unsafe("SELECT COUNT(*)::int AS n FROM information_schema.tables WHERE table_schema=\'public\' AND table_name=\'clinic_console_preferences\'");
   if(Number(fav[0]?.n)!==1)throw Error("Console favorites schema incomplete");
   console.log("Console doctor preferences table verified.");
