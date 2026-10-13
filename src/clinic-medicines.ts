@@ -82,7 +82,7 @@ export function validCatalogPrescription(meds,catalog){
  for(const med of meds){
   const m=catalog.find(x=>x.id===med.catalogId&&x.active!==false&&x.stock!==0);
   if(!m)throw Error("Prescription contains medicine outside the available clinic catalog");
-  if(m.name!==med.name||m.strength!==med.strength||m.route!==med.route)throw Error("Prescription medicine does not match catalog formulation");
+  if(m.name!==med.name||m.strength!==med.strength||m.form!==med.form||m.route!==med.route)throw Error("Prescription medicine does not match catalog formulation");
   if(!med.frequency||!med.duration||!med.dose)throw Error("Each medicine requires explicit dose, frequency and duration");
  }
  return true;
