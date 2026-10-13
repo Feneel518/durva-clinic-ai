@@ -321,7 +321,17 @@ async function openEntry(id,retain=false){
  if(!retain||!S.draft)S.draft=emptyDraft(e,v);
  if(v?.status==="approved")S.draft.note={...v.note};
  S.voiceOrders=null;
- if(e.visitId){try{S.voiceOrders=await api("/api/opd/entries/"+e.id+"/voice-orders");}catch{S.voiceOrders=null;}}
+ if(e.visitId){
+  try{
+   S.voiceOrders=await api("/api/opd/entries/"+e.id+"/voice-orders");
+   if(!e.prescription?.signedAt){
+    const added=new Set(S.draft.rx.medicines.map(m=>m.catalogId).filter(Boolean));
+    for(const med of (S.voiceOrders.accepted||[]))if(!added.has(med.catalogId)){
+     S.draft.rx.medicines.push({...med});added.add(med.catalogId);
+    }
+   }
+  }catch{S.voiceOrders=null;}
+ }
  if(e.followup?.dueDate){const ms=Date.parse(e.followup.dueDate+"T00:00:00+05:30")-Date.parse(dateIST()+"T00:00:00+05:30");S.draft.followDays=Math.max(0,Math.round(ms/86400000));}
  render();window.scrollTo({top:0,behavior:"instant"});
 }
@@ -609,8 +619,8 @@ document.addEventListener("submit",e=>{
  if(e.target.id!=="loginForm")return;e.preventDefault();
  job(async()=>{
   const d=Object.fromEntries(new FormData(e.target));await api("/api/login","POST",d);
-  S.auth=true;S.user={email:d.email};const [p,f]=await Promise.all([api("/api/opd/profile"),api("/api/console/favorites")]);
-  S.profile=p.profile;S.favorites=f.favorites;await loadHome();
+  S.auth=true;S.user={email:d.email};const [p,f,m]=await Promise.all([api("/api/opd/profile"),api("/api/console/favorites"),api("/api/clinic/medicines")]);
+  S.profile=p.profile;S.favorites=f.favorites;S.catalog=m.medicines;await loadHome();
  });
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.overlay){S.overlay=null;render();}});
