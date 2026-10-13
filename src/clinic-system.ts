@@ -1,4 +1,5 @@
 import {randomUUID} from "node:crypto";
+import {listCatalog,validCatalogPrescription} from "./clinic-medicines";
 
 const statuses=["scheduled","waiting","in_consultation","completed","cancelled","no_show"];
 const transitions={scheduled:["waiting","cancelled","no_show"],waiting:["in_consultation","cancelled"],in_consultation:["completed","waiting"],completed:[],cancelled:[],no_show:[]};
@@ -19,7 +20,7 @@ export function normalizeRx(raw){
  const meds=Array.isArray(raw?.medicines)?raw.medicines:[];
  if(meds.length>15)throw Error("Maximum 15 medicines in one prescription");
  const rx={diagnosis:scrub(raw?.diagnosis,1800),advice:scrub(raw?.advice,2500),investigations:scrub(raw?.investigations,1800),
- medicines:meds.map(m=>({name:scrub(m?.name,160),strength:scrub(m?.strength,80),route:scrub(m?.route,80),frequency:scrub(m?.frequency,120),duration:scrub(m?.duration,120),instructions:scrub(m?.instructions,240)})).filter(m=>m.name)};
+ medicines:meds.map(m=>({catalogId:scrub(m?.catalogId,50),name:scrub(m?.name,160),strength:scrub(m?.strength,80),form:scrub(m?.form,70),route:scrub(m?.route,80),dose:scrub(m?.dose,80),frequency:scrub(m?.frequency,120),duration:scrub(m?.duration,120),timingTokens:Array.isArray(m?.timingTokens)?m.timingTokens.filter(t=>["morning","afternoon","evening","night","bedtime","as_needed"].includes(t)).slice(0,6):[],mealTiming:["before_food","after_food","with_food"].includes(m?.mealTiming)?m.mealTiming:"none",instructions:scrub(m?.instructions,240)})).filter(m=>m.name)};
  if(rx.medicines.length===0&&!rx.advice&&!rx.investigations)throw Error("Enter medicine, advice, or investigations before saving a prescription");
  return rx;
 }
@@ -119,6 +120,13 @@ export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
   const patients=r.map(x=>({id:x.id,code:"DC-"+String(x.seq).padStart(5,"0"),...unpack(x.data_enc)})).filter(x=>!q||String(x.name||"").toLowerCase().includes(q)||String(x.phone||"").includes(q)||x.code.toLowerCase().includes(q)).slice(0,100);
   return reply({patients});
  });
+ const speechDraft=/^\/api\/opd\/entries\/([0-9a-f-]{36})\/voice-orders$/.exec(path);
+ if(method==="GET"&&speechDraft)return safe(async()=>{
+  const encounter=await entry(speechDraft[1]);if(!encounter)return error("Encounter not found",404);
+  if(!encounter.visit_id)return reply({accepted:[],unmatched:[],warnings:[],state:"not_started"});
+  const rows=await sql.unsafe("SELECT data_enc FROM clinic_voice_med_drafts WHERE visit_id=$1",[encounter.visit_id]);
+  return reply(rows.length?{...unpack(rows[0].data_enc),state:"ready"}:{accepted:[],unmatched:[],warnings:[],state:"not_ready"});
+ });
  if(method==="GET"&&path==="/api/opd/followups")return safe(async()=>{
   const r=await sql.unsafe("SELECT f.*,e.patient_id,p.seq,p.data_enc FROM clinic_opd_followups f JOIN clinic_opd_entries e ON e.id=f.entry_id JOIN clinic_patients p ON p.id=e.patient_id WHERE f.status='pending' ORDER BY f.due_date ASC LIMIT 300");
   return reply({followups:r.map(x=>({id:x.id,entryId:x.entry_id,dueDate:formatSQLDate(x.due_date),notes:unpack(x.notes_enc),patient:{id:x.patient_id,name:unpack(x.data_enc).name,phone:unpack(x.data_enc).phone,code:"DC-"+String(x.seq).padStart(5,"0")}}))});
@@ -166,6 +174,7 @@ export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
   const e=await entry(rx[1]);if(!e)return error("Entry not found",404);if(["cancelled","no_show","completed"].includes(e.status))return error("Cannot edit this encounter");
   const prev=await sql.unsafe("SELECT signed_at FROM clinic_opd_prescriptions WHERE entry_id=$1",[e.id]);if(prev[0]?.signed_at)return error("Signed prescription is locked",409);
   const value=normalizeRx(await json());
+  validCatalogPrescription(value.medicines,await listCatalog(sql,unpack,user.id));
   await sql.unsafe("INSERT INTO clinic_opd_prescriptions(entry_id,data_enc) VALUES($1,$2) ON CONFLICT(entry_id) DO UPDATE SET data_enc=EXCLUDED.data_enc,updated_at=now() WHERE clinic_opd_prescriptions.signed_at IS NULL",[e.id,pack(value)]);
   await audit("prescription.drafted",e.id);return reply({prescription:{...value,signedAt:null}});
  });
@@ -186,7 +195,7 @@ export async function clinicAPI({sql,req,url,user,pack,unpack,reply,err}){
  if(method==="GET"&&prescriptionPrint)return safe(async()=>{
   const d=await full(prescriptionPrint[1]);if(!d)return error("Entry not found",404);if(!d.prescription?.signedAt)return error("Prescription must be signed before printing",403);
   const r=d.prescription,pro=r.signer||await profile(),esc=htmlEscape;
-  const meds=r.medicines.map((m,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(m.name)+' '+esc(m.strength)+'</td><td>'+esc(m.route)+'</td><td>'+esc(m.frequency)+'</td><td>'+esc(m.duration)+'</td><td>'+esc(m.instructions)+'</td></tr>').join("");
+  const meds=r.medicines.map((m,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(m.name)+' '+esc(m.strength)+'</td><td>'+esc(m.dose||"—")+' · '+esc(m.route)+'</td><td>'+esc(m.frequency)+' · '+esc((m.timingTokens||[]).join(", "))+(m.mealTiming&&m.mealTiming!=="none"?" · "+esc(m.mealTiming.replaceAll("_"," ")):"")+'</td><td>'+esc(m.duration)+'</td><td>'+esc(m.instructions)+'</td></tr>').join("");
   const body='<header><h1>'+esc(pro.clinicName)+'</h1><p>'+esc(pro.address)+' '+esc(pro.phone)+'</p><hr><strong>'+esc(pro.clinicianName)+'</strong> · Reg. '+esc(pro.registrationNumber)+'</header><section>Patient: '+esc(d.patient.name)+' · '+esc(d.patient.code)+' · Age: '+esc(d.patient.age)+' · Date: '+esc(d.date)+'</section><h2>Prescription</h2>'+(r.diagnosis?'<section><strong>Assessment:</strong> '+esc(r.diagnosis)+'</section>':'')+'<table><tr><th>#</th><th>Medicine</th><th>Route</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr>'+meds+'</table>'+(r.investigations?'<section><strong>Investigations:</strong><p>'+esc(r.investigations)+'</p></section>':'')+(r.advice?'<section><strong>Instructions:</strong><p>'+esc(r.advice)+'</p></section>':'')+'<footer>Clinician review recorded in clinic system<br>'+esc(pro.clinicianName)+'<br>Registration '+esc(pro.registrationNumber)+'<p style="margin-top:40px">Doctor’s signature / stamp: ___________________</p></footer>';
   return printHTML("Signed OPD Prescription",body);
  });
