@@ -170,11 +170,19 @@ function more(){
  '<div class="stack" style="margin-top:14px">'+btn("Change password","open-password","white")+btn("Sign out","logout","white")+'</div></section></div></div>';
 }
 function rxMedicine(m,i){
- return '<div class="medicine"><div class="medicine-top"><span class="medicine-title">Medicine '+(i+1)+'</span>'+btn("Remove","remove-med","white small",'data-index="'+i+'"')+'</div><div class="med-grid">'+
- field("Medicine name","med."+i+".name",m.name,"Name / formulation")+field("Strength","med."+i+".strength",m.strength,"e.g. 500 mg")+
- field("Route","med."+i+".route",m.route,"Oral / topical")+
- field("Frequency","med."+i+".frequency",m.frequency,"Doctor specified")+field("Duration","med."+i+".duration",m.duration,"Days")+
- field("Instructions","med."+i+".instructions",m.instructions,"Optional")+'</div></div>';
+ const timing=["morning","afternoon","evening","night","bedtime","as_needed"];
+ const active=Array.isArray(m.timingTokens)?m.timingTokens:[];
+ const meals=[["none","No meal timing"],["before_food","Before food"],["after_food","After food"],["with_food","With food"]];
+ return '<div class="medicine catalog-prescription"><div class="medicine-top"><span class="medicine-title">'+E(m.name)+' · '+E(m.strength)+'</span>'+btn("Remove","remove-med","white small",'data-index="'+i+'"')+'</div>'+
+ '<div class="catalog-status">'+(m.catalogId?'<span class="med-tag verified">✓ Clinic catalog</span>':'<span class="med-tag caution">Unmatched: remove & select from catalog</span>')+
+ (m.reviewRequired?'<span class="med-tag caution">Voice draft · verify</span>':'')+'</div>'+
+ '<div class="med-grid">'+field("Dose","med."+i+".dose",m.dose||"","Doctor stated")+
+ field("Frequency","med."+i+".frequency",m.frequency||"","Doctor stated")+
+ field("Duration","med."+i+".duration",m.duration||"","Doctor stated")+
+ field("Route","med."+i+".route",m.route||"","Formulation route")+
+ field("Instructions","med."+i+".instructions",m.instructions||"","Optional")+'</div>'+
+ '<div class="med-tag-label">Spoken time of day · select only what the doctor said</div><div class="tag-strip">'+timing.map(k=>'<button type="button" class="timing-tag '+(active.includes(k)?"selected":"")+'" data-action="timing-tag" data-index="'+i+'" data-token="'+k+'">'+E(k.replace("_"," "))+'</button>').join("")+'</div>'+
+ '<div class="med-tag-label">Meal relation · optional</div><div class="tag-strip">'+meals.map(x=>'<button type="button" class="timing-tag '+((m.mealTiming||"none")===x[0]?"selected":"")+'" data-action="meal-tag" data-index="'+i+'" data-meal="'+x[0]+'">'+E(x[1])+'</button>').join("")+'</div></div>';
 }
 function visitView(){
  const e=S.entry,d=S.draft,vst=S.visit,canEdit=!["completed","cancelled","no_show"].includes(e.status);
