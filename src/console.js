@@ -21,7 +21,7 @@ const emptyAss=()=>({systolic:"",diastolic:"",pulse:"",tempC:"",spo2:"",weightKg
 const emptyMed=()=>({name:"",strength:"",route:"",frequency:"",duration:"",instructions:""});
 const freshRx=()=>({diagnosis:"",advice:"",investigations:"",medicines:[]});
 const dateIST=()=>new Date(Date.now()+19800000).toISOString().slice(0,10);
-const S={auth:false,user:null,page:"today",overlay:null,ready:false,profile:null,overview:null,patients:[],followups:[],reports:null,entry:null,visit:null,history:[],patient:null,favorites:{medicines:[],complaints:[]},draft:null,pd:{name:"",age:"",phone:"",sex:"",address:"",allergies:""},consent:false,recording:null,audio:null,audioMime:null,recordKind:null,voiceJob:null,voiceTicket:null,voiceTranscript:"",voiceUncertain:"",busy:false,loadedAt:0,search:"",searchDelay:null,lastVoiceError:"",catalog:[],voiceOrders:null,showClinical:false};
+const S={auth:false,user:null,page:"today",overlay:null,ready:false,profile:null,overview:null,patients:[],followups:[],reports:null,entry:null,visit:null,history:[],patient:null,favorites:{medicines:[],complaints:[]},draft:null,pd:{name:"",age:"",phone:"",sex:"",address:"",allergies:""},consent:false,recording:null,audio:null,audioMime:null,recordKind:null,voiceJob:null,voiceTicket:null,voiceTranscript:"",voiceUncertain:"",busy:false,loadedAt:0,search:"",searchDelay:null,lastVoiceError:"",catalog:[],voiceOrders:null,showClinical:false,existingPatient:null};
 function E(t){return String(t??"").replace(/[&<>"']/g,k=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[k]));}
 const money=p=>"₹"+(Number(p||0)/100).toLocaleString("en-IN",{minimumFractionDigits:0,maximumFractionDigits:2});
 const dateLabel=d=>new Date(d+"T00:00:00+05:30").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
@@ -99,8 +99,9 @@ function overlayHtml(){
    field("Full name *","pd.name",S.pd.name,"Patient name")+field("Age","pd.age",S.pd.age,"In years","number")+
    field("Mobile","pd.phone",S.pd.phone,"10-digit mobile","tel")+field("Sex","pd.sex",S.pd.sex,"Male / Female / Other")+
    field("Area / address","pd.address",S.pd.address,"Optional")+field("Allergies reported","pd.allergies",S.pd.allergies,"Optional")+'</div>'+
+   (S.existingPatient?'<div class="note good"><strong>Existing patient found:</strong> '+E(S.existingPatient.name)+' · '+E(S.existingPatient.code)+'. Confirm identity before opening the visit.</div>':"")+
    (S.voiceTranscript?'<details class="details"><summary>View original transcription</summary><p class="small">'+E(S.voiceTranscript)+'</p></details>':"")+
-   '<div class="dialog-footer">'+btn("Cancel","close","white")+btn("Save & start visit","register-patient")+'</div>';
+   '<div class="dialog-footer">'+btn("Cancel","close","white")+btn(S.existingPatient?"Confirm patient & start":"Save patient & start","register-patient")+'</div>';
  }
  if(S.overlay==="review"){
   const d=S.draft,e=S.entry,meds=d?.rx?.medicines.filter(x=>x.name?.trim())||[],total=d?.charge||S.profile?.consultationFee||"300";
@@ -296,7 +297,7 @@ async function navigate(to){S.overlay=null;if(to==="today"){await loadHome();ret
 async function openPicker(){
  const r=await api("/api/opd/patients");S.patients=r.patients;S.search="";S.overlay="picker";render();
 }
-function resetRegistration(){S.pd={name:"",age:"",phone:"",sex:"",address:"",allergies:""};S.consent=false;S.voiceJob=null;S.voiceTicket=null;S.voiceTranscript="";S.voiceUncertain="";S.audio=null;S.audioMime=null;}
+function resetRegistration(){S.pd={name:"",age:"",phone:"",sex:"",address:"",allergies:""};S.consent=false;S.voiceJob=null;S.voiceTicket=null;S.voiceTranscript="";S.voiceUncertain="";S.audio=null;S.audioMime=null;S.existingPatient=null;}
 function openRegister(){resetRegistration();S.overlay="register";render();}
 async function queuePatient(id){
  const current=await api("/api/opd/overview?date="+dateIST());
@@ -359,6 +360,7 @@ async function registerAndStart(){
  const possible=pts.patients.find(p=>(S.pd.phone&&p.phone===S.pd.phone)||p.name?.trim().toLowerCase()===patientName);
  if(possible&&!confirm("A patient with this name or number already exists. Create a new record anyway?"))return;
  if(S.voiceTranscript&&!confirm("Have you checked the patient name, age, phone and spoken details?"))return;
+ if(S.existingPatient){const patient=S.existingPatient;resetRegistration();S.overlay=null;await choosePatient(patient.id);return;}
  const p=await api("/api/patients","POST",S.pd);
  resetRegistration();S.overlay=null;await choosePatient(p.id);
 }
@@ -403,7 +405,17 @@ async function pollRegistration(){
   const r=await api("/api/patients/voice/status?job="+encodeURIComponent(jobId)+"&ticket="+encodeURIComponent(ticket));
   if(r.state==="completed"){
    for(const k of ["name","age","phone","sex","address","allergies"])if(r.fields?.[k])S.pd[k]=r.fields[k];
-   S.voiceJob=null;S.voiceTicket=null;S.voiceTranscript=r.transcript||"";S.voiceUncertain=r.uncertainties||"";render();toast("Patient details filled. Please verify before saving.");return;
+   S.voiceJob=null;S.voiceTicket=null;S.voiceTranscript=r.transcript||"";S.voiceUncertain=r.uncertainties||"";
+   S.existingPatient=null;
+   try{
+    const query=String(S.pd.phone||S.pd.name||"").trim();
+    if(query){
+     const search=await api("/api/opd/patients?q="+encodeURIComponent(query));
+     const matches=search.patients.filter(p=>S.pd.phone?String(p.phone||"")===String(S.pd.phone):String(p.name||"").trim().toLowerCase()===String(S.pd.name||"").trim().toLowerCase());
+     if(matches.length===1)S.existingPatient=matches[0];
+    }
+   }catch{}
+   render();toast(S.existingPatient?"Existing patient matched. Verify identity before starting.":"Patient details filled. Please verify before saving.");return;
   }
   if(r.state==="failed"){S.voiceJob=null;render();throw Error("Sarvam could not transcribe the registration.");}
   await new Promise(resolve=>setTimeout(resolve,4500));
