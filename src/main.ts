@@ -3,6 +3,8 @@ import { startBatch, checkBatch, structure } from "./sarvam";
 import { extractVoicePatient } from "./patient-registration";
 import { ensureClinicSchema,clinicAPI } from "./clinic-system";
 import { ensureConsoleSchema,consoleApi } from "./console-api";
+import {ensureMedicineSchema,listCatalog,medicineAPI} from "./clinic-medicines";
+import {extractSpokenOrders} from "./voice-orders";
 import { randomBytes, createHash, createHmac, createCipheriv, createDecipheriv, timingSafeEqual, randomUUID } from "node:crypto";
 const env=Bun.env;
 if(!env.DATABASE_URL||!env.APP_ENCRYPTION_KEY)throw Error("Database and encryption key required");
@@ -17,6 +19,7 @@ if(users[0].n===0){if(!env.BOOTSTRAP_PASSWORD||env.BOOTSTRAP_PASSWORD.length<12)
 await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_ai_jobs(visit_id uuid PRIMARY KEY REFERENCES clinic_visits(id),job_id text NOT NULL,created_at timestamptz NOT NULL DEFAULT now())");
 await ensureClinicSchema(sql);
 await ensureConsoleSchema(sql);
+await ensureMedicineSchema(sql);
 dbReady=true;
 }catch(e){dbError=String(e?.message||e);console.error("Database setup failed",dbError);}})();
 const names=["chiefComplaint","historyOfPresentIllness","pastHistory","examination","assessment","plan","medications","followUp","uncertainties"];
@@ -62,6 +65,7 @@ if(!["GET","POST","PATCH","PUT","DELETE"].includes(method))return err("Method un
 if(method!=="GET"){const o=req.headers.get("origin");if(o&&new URL(o).host!==url.host)return err("Origin rejected",403);if(req.headers.get("x-clinic-request")!=="1")return err("Request header missing",403);}
 if(path==="/api/login"&&method==="POST"){const ip=req.headers.get("cf-connecting-ip")||"default",t=Date.now();const z=tries.get(ip)||{n:0,t};if(t-z.t>900000){z.n=0;z.t=t;}z.n++;tries.set(ip,z);if(z.n>15)return err("Too many login attempts",429);const b=await req.json();const rows=await sql.unsafe("SELECT * FROM clinic_users WHERE email=$1",[clean(b.email,160).toLowerCase()]);const u=rows[0];if(!u||!await Bun.password.verify(String(b.password||""),u.password_hash))return err("Invalid credentials",401);const tok=randomBytes(32).toString("base64url");await sql.unsafe("INSERT INTO clinic_sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '12 hours')",[hash(tok),u.id]);return reply({ok:true},200,{"Set-Cookie":cookie(tok,43200)});}
 const u=await userFrom(req);if(!u)return err("Sign in required",401);
+if(path.startsWith("/api/clinic/medicines"))return medicineAPI({sql,req,url,user:u,pack,unpack,reply,err});
 if(path.startsWith("/api/opd/"))return clinicAPI({sql,req,url,user:u,pack,unpack,reply,err});
 if(path==="/api/console/favorites")return consoleApi({sql,req,user:u,pack,unpack,reply,err});
 if(path==="/api/me"&&method==="GET")return reply({user:{email:u.email},aiConfigured:!!env.SARVAM_API_KEY});
@@ -139,6 +143,15 @@ if(method==="GET"&&action==="status"){
  let note;try{note=normalized(await structure(z.transcript,env.SARVAM_API_KEY,names))}catch(e){console.error("Sarvam note:",String(e?.message||e).slice(0,100));return err("Transcript completed, but clinical draft could not be created. Check Status to retry.",502);}
  const updated=await sql.unsafe("UPDATE clinic_visits SET transcript_enc=$1,note_enc=$2,version=version+1 WHERE id=$3 AND version=$4 AND status='draft' RETURNING id",[pack(z.transcript),pack(note),id,v.version]);
  if(!updated.length)return err("Draft was modified while AI processed; reload before proceeding.",409);
+ // Derive suggestion-only medicine candidates. The server filters against this doctor's real clinic catalog.
+ // Failures do not block the consultation note or prevent manual clinician review.
+ try{
+  const catalog=await listCatalog(sql,unpack,u.id);
+  if(catalog.length){
+   const suggestions=await extractSpokenOrders(z.transcript,env.SARVAM_API_KEY,catalog);
+   await sql.unsafe("INSERT INTO clinic_voice_med_drafts(visit_id,data_enc) VALUES($1,$2) ON CONFLICT(visit_id) DO UPDATE SET data_enc=EXCLUDED.data_enc,created_at=now()",[id,pack(suggestions)]);
+  }
+ }catch(e){console.error("Voice prescription extraction unavailable:",String(e?.message||e).slice(0,110));}
  await sql.unsafe("DELETE FROM clinic_ai_jobs WHERE visit_id=$1 AND job_id=$2",[id,record.job_id]);
  return reply({state:"completed",visit:await oneVisit(id)});
 }
