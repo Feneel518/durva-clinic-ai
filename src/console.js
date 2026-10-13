@@ -368,9 +368,13 @@ async function registerAndStart(){
  const patientName=createRegistrationId();
  const pts=await api("/api/opd/patients?q="+encodeURIComponent(S.pd.phone||S.pd.name));
  const possible=pts.patients.find(p=>(S.pd.phone&&p.phone===S.pd.phone)||p.name?.trim().toLowerCase()===patientName);
+ if(S.existingPatient){
+  const patient=S.existingPatient;
+  if(!confirm("Confirm patient identity: "+patient.name+" ("+patient.code+")?"))return;
+  resetRegistration();S.overlay=null;await choosePatient(patient.id);return;
+ }
  if(possible&&!confirm("A patient with this name or number already exists. Create a new record anyway?"))return;
  if(S.voiceTranscript&&!confirm("Have you checked the patient name, age, phone and spoken details?"))return;
- if(S.existingPatient){const patient=S.existingPatient;resetRegistration();S.overlay=null;await choosePatient(patient.id);return;}
  const p=await api("/api/patients","POST",S.pd);
  resetRegistration();S.overlay=null;await choosePatient(p.id);
 }
