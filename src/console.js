@@ -69,12 +69,12 @@ async function refreshQueue({notify=true}={}){
 
 function chrome(body){
  const nav=navItems();
- return '<div class="shell"><aside class="rail"><div class="brand"><span class="brand-symbol">✳</span><span><div class="brand-name">durva<span style="color:var(--garnet)">.</span></div><div class="brand-sub">CLINIC WORKSPACE</div></span></div><div class="rail-label">Your practice</div>'+
+ return '<div class="shell"><aside class="rail"><div class="brand"><span class="brand-symbol">✚</span><span><div class="brand-name">durva<span style="color:var(--garnet)">.</span></div><div class="brand-sub">CLINIC WORKSPACE</div></span></div><div class="rail-label">Your practice</div>'+
  nav.map(x=>'<button class="nav '+(S.page===x[0]?"active":"")+'" data-action="navigate" data-to="'+x[0]+'"><span class="nav-icon">'+icon(x[1],18)+'</span>'+x[2]+'</button>').join("")+
  '<div class="rail-rule"></div><button class="nav" data-action="start"><span class="nav-icon">'+icon("plus",18)+'</span>New consultation</button>'+
  '<div class="rail-bottom"><div class="doctor-pill"><span class="avatar">Dr</span><span class="doctor-meta"><strong>'+E(S.profile?.clinicianName||S.user?.email||"Your practice")+'</strong><small>Private clinic account</small></span></div></div></aside>'+
  '<div class="main"><div class="container"><div class="topline"><span class="topline-left"><span class="live-dot"></span> Practice workspace <span style="color:#d4d1d4">/</span> '+(S.entry?"Consultation":S.page==="today"?"Today":S.page==="more"?"Settings":S.page==="followups"?"Follow-ups":"Patients")+'</span>'+
- '<span class="mobile-brand"><span class="brand-symbol">✳</span>durva.</span><span class="topline-right">'+waitingBadge()+'<span class="date">'+E(dayLabel())+'</span>'+btn(icon("plus",17)+" New visit","start","white small")+'</span></div>'+body+'</div></div></div>'+
+ '<span class="mobile-brand"><span class="brand-symbol">✚</span>durva.</span><span class="topline-right">'+waitingBadge()+'<span class="date">'+E(dayLabel())+'</span>'+btn(icon("plus",17)+" New visit","start","white small")+'</span></div>'+body+'</div></div></div>'+
  '<nav class="bottom-nav" aria-label="Main navigation">'+nav.map(x=>'<button data-action="navigate" data-to="'+x[0]+'" class="'+(S.page===x[0]?"active":"")+'"><span>'+icon(x[1],19)+'</span>'+x[2]+'</button>').join("")+'</nav>';
 }
 function overlayHtml(){
@@ -140,7 +140,7 @@ function overlayHtml(){
  return '<div class="overlay" role="presentation" data-action="overlay-bg"><section class="dialog '+(S.overlay==="register"?"wide":"")+'" role="dialog" aria-modal="true" aria-label="'+E(S.overlay)+'">'+body+'</section></div>';
 }
 function login(){
- return '<div class="login"><div class="login-art"><div class="flex"><span class="brand-symbol">✳</span><span class="brand-name" style="color:white;margin-left:10px">durva.</span></div><div><div class="micro" style="letter-spacing:.16em;color:#c9b8c2;margin-bottom:20px">A QUIETER WAY TO CARE</div><h1>More time for<br>your patients.</h1><p>Your entire practice in one beautifully simple place. Clinical work, without the busywork.</p></div><div class="micro" style="color:#998d97">Designed for one focused doctor.</div></div>'+
+ return '<div class="login"><div class="login-art"><div class="flex"><span class="brand-symbol">✚</span><span class="brand-name" style="color:white;margin-left:10px">durva.</span></div><div><div class="micro" style="letter-spacing:.16em;color:#c9b8c2;margin-bottom:20px">CLINICAL WORKSPACE</div><h1>Thoughtful care.<br>Less administration.</h1><p>Patient records, visits and prescriptions—beautifully organized in one private workspace.</p></div><div class="micro" style="color:#998d97">Designed for a more considered practice.</div></div>'+
  '<div class="login-form"><form id="loginForm" class="login-card"><div class="head-eyebrow">Durva Clinic</div><h2>Welcome back.</h2><p>Sign in to your private clinic workspace.</p>'+
  '<div class="field"><label>Email</label><input type="email" name="email" autocomplete="username" value="doctor@durvaclinic.local" required></div><div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password" required></div>'+
  '<button class="btn full" type="submit">Sign in to clinic '+icon("arrow",16)+'</button><p class="micro" style="margin-top:18px;text-align:center">Authorized clinical staff only</p></form></div></div>';
@@ -148,9 +148,8 @@ function login(){
 function today(){
  const o=S.overview||{entries:[],stats:{}},n=o.stats,waiting=o.entries.filter(x=>x.status==="waiting");
  const recent=[...o.entries].sort((a,b)=>{const priority=x=>x.status==="waiting"?0:x.status==="in_consultation"?1:x.status==="scheduled"?2:3;return priority(a)-priority(b);}).slice(0,7),followups=S.followups.slice(0,5);
- return '<div class="headline"><div><div class="head-eyebrow">Good '+(new Date().getHours()<12?"morning":new Date().getHours()<17?"afternoon":"evening")+'</div><h1>Ready for the next patient?</h1><p class="head-sub">Your entire practice, without the paperwork.</p></div></div>'+
- '<div class="hero"><section class="hero-main"><div><div class="tag">A quieter way to consult</div><h2>Care first. Notes handled.</h2><p>Find a patient, record the visit, review, and finish.</p></div><div class="hero-actions">'+btn(icon("plus",17)+" Start consultation","start","")+btn(icon("mic",17)+" Voice register","open-register","alt")+'</div></section>'+
- '<section class="hero-side"><div class="side-icon">'+icon("clock",22)+'</div><div><h3>'+(waiting.length?waiting.length+" patient"+(waiting.length===1?"":"s")+" waiting":"A little breathing room.")+'</h3><p>'+(waiting.length?"Your next consultations are ready below.":"There are no patients waiting right now.")+'</p>'+btn(waiting.length?"Open next patient":"Find a patient","open-next","white small")+'</div></section></div>'+
+ return '<div class="headline"><div><div class="head-eyebrow">Good '+(new Date().getHours()<12?"morning":new Date().getHours()<17?"afternoon":"evening")+'</div><h1>Today at the clinic.</h1><p class="head-sub">Your patients, appointments and collections at a glance.</p></div><div class="headline-actions">'+btn(icon("plus",17)+" New consultation","start","")+btn(icon("mic",16)+" Register patient","open-register","white")+'</div></div>'+
+ '<div class="day-brief"><div class="day-brief-left"><span class="day-brief-kicker">CURRENT QUEUE</span><h2>'+(waiting.length?waiting.length+' patient'+(waiting.length===1?'':'s')+' waiting':'Your queue is clear')+'</h2><p>'+(waiting.length?'Open the next consultation or review the patient list below.':'Patients will appear here after check-in. Start by registering a patient.')+'</p></div><div class="day-brief-actions">'+btn(waiting.length?'Open next patient':'Find a patient','open-next','white small')+'</div></div>'+
  '<div class="stats">'+[["Waiting",n.waiting||0,"Checked in"],["Consulting",n.active||0,"Currently with doctor"],["Completed",n.completed||0,"Visits finished"],["Collected",money(n.collectedPaise),"Payments received"]].map(x=>'<div class="metric"><label>'+x[0]+'</label><strong>'+x[1]+'</strong><small>'+x[2]+'</small></div>').join("")+'</div>'+
  '<div class="columns"><section class="panel" id="today-queue"><div class="panel-header"><div><h2>Today’s patients</h2><div class="caption">Walk-ins and appointments</div></div>'+btn("See all","navigate","white small",'data-to="patients"')+'</div>'+
  (recent.length?'<div class="queue-list">'+recent.map(q=>queueRow(q)).join("")+'</div>':'<div class="empty">'+svgEmpty+'<strong>Your clinic desk is clear.</strong>Register a patient or start a consultation to begin.</div>')+'</section>'+
@@ -163,18 +162,18 @@ function queueRow(q){
 }
 function patients(){
  const search=S.search.toLowerCase().trim(),people=S.patients.filter(p=>!search||String(p.name||"").toLowerCase().includes(search)||String(p.phone||"").includes(search)||String(p.code||"").toLowerCase().includes(search)).slice(0,60);
- return '<div class="headline"><div><div class="head-eyebrow">Patient directory</div><h1>People, not paperwork.</h1><p class="head-sub">Find someone in seconds. Everything else follows.</p></div>'+btn(icon("mic",16)+" New patient","open-register","head-btn")+'</div>'+
+ return '<div class="headline"><div><div class="head-eyebrow">Patient directory</div><h1>Patients</h1><p class="head-sub">Find records, register patients, or start a visit.</p></div>'+btn(icon("mic",16)+" New patient","open-register","head-btn")+'</div>'+
  '<section class="panel"><div class="searchbox"><input data-field="search" value="'+E(S.search)+'" placeholder="Search by name, mobile or patient ID" aria-label="Search patient"></div>'+
  '<div class="patient-list">'+(people.length?people.map(p=>'<div class="patient-row">'+patientAvatar(p)+'<span class="info"><strong>'+E(p.name)+'</strong><small>'+E(p.code)+' · '+E(p.age||"—")+' yrs · '+E(p.phone||"No phone")+'</small></span>'+'<span class="quick-actions">'+btn("Add to queue","queue-patient","soft small",'data-id="'+E(p.id)+'"')+btn("Start visit","choose-patient","white small",'data-id="'+E(p.id)+'"')+'</span>'+'</div>').join(""):'<div class="empty">'+svgEmpty+'<strong>No patients found</strong>Try a different name or register a new patient.</div>')+'</div></section>';
 }
 function followups(){
- return '<div class="headline"><div><div class="head-eyebrow">Continuity of care</div><h1>Never lose the thread.</h1><p class="head-sub">Patients who are due for a review.</p></div></div>'+
+ return '<div class="headline"><div><div class="head-eyebrow">Continuity of care</div><h1>Follow-ups</h1><p class="head-sub">Patients who are due for a review.</p></div></div>'+
  '<section class="panel"><div class="panel-header"><h2>Pending follow-ups</h2><span class="caption">'+S.followups.length+' pending</span></div>'+
  (S.followups.length?S.followups.map(f=>'<div class="patient-row">'+patientAvatar(f.patient)+'<span class="info"><strong>'+E(f.patient.name)+'</strong><small>'+E(f.dueDate)+' · '+E(f.notes||"Review visit")+'</small></span>'+btn("Open","open-entry","white small",'data-id="'+E(f.entryId)+'"')+btn(icon("check",16),"done-followup","soft circle",'data-id="'+E(f.id)+'"')+'</div>').join(""):'<div class="empty">'+svgEmpty+'<strong>All caught up.</strong>No pending follow-up visits.</div>')+'</section>';
 }
 function more(){
  const p=S.profile||{},fav=S.favorites||{medicines:[],complaints:[]},r=S.reports;
- return '<div class="headline"><div><div class="head-eyebrow">Your workspace</div><h1>Make Durva yours.</h1><p class="head-sub">Set your defaults once, then spend more time with patients.</p></div></div>'+
+ return '<div class="headline"><div><div class="head-eyebrow">Your workspace</div><h1>Clinic settings</h1><p class="head-sub">Manage clinic details, medicines and account preferences.</p></div></div>'+
  '<div class="columns"><div><section class="panel"><div class="panel-header"><h2>Clinic identity</h2></div><div class="form-grid">'+
  field("Clinic name","profile.clinicName",p.clinicName)+field("Doctor’s name","profile.clinicianName",p.clinicianName)+field("Medical registration number","profile.registrationNumber",p.registrationNumber)+field("Clinic phone","profile.phone",p.phone)+
  field("Default visit fee (₹)","profile.consultationFee",p.consultationFee,"300")+field("Clinic address","profile.address",p.address)+
@@ -212,8 +211,8 @@ function visitView(){
  (canEdit?btn(icon("check",17)+" Review & complete","review-visit","green"):btn("View completed visit","noop","soft"))+'</div>'+
  '<div class="progress">'+[["Patient",0],["Consultation",1],["Review",2],["Done",3]].map((x,i)=>'<div class="progress-step '+(currentStep>x[1]?"done":currentStep===x[1]?"current":"")+'"><span>'+(currentStep>x[1]?"✓":i+1)+'</span>'+x[0]+'</div>').join("")+'</div>'+
  '<div class="visit-columns"><div class="visit-main">'+
- '<section class="panel voice-first"><div class="step-head"><h2>Voice consultation</h2><small>Speak first, review after</small></div>'+
- '<div class="voice-intro"><div class="voice-orb">'+icon("mic",26)+'</div><div><h3>'+(S.recording?.state==="recording"&&S.recordKind==="consultation"?"Recording your consultation…":S.voiceJob?"Converting speech to notes…":vst?.transcript?"Voice draft ready for your review":"Everything starts with your voice")+'</h3><p>Speak with the patient naturally in Gujarati, Hindi or English. Clinical notes and catalog-matched medicines will be prepared for review.</p></div></div>'+
+ '<section class="panel voice-first"><div class="step-head"><h2>Voice consultation</h2><small>Consent required · doctor reviewed</small></div>'+
+ '<div class="voice-intro"><div class="voice-orb">'+icon("mic",26)+'</div><div><h3>'+(S.recording?.state==="recording"&&S.recordKind==="consultation"?"Recording your consultation…":S.voiceJob?"Converting speech to notes…":vst?.transcript?"Voice draft ready for your review":"Record the consultation")+'</h3><p>With consent, capture Gujarati, Hindi or English speech. Review the structured notes and confirm all clinical details before signing.</p></div></div>'+
  '<div class="voice-cta">'+
  (S.recording?.state==="recording"&&S.recordKind==="consultation"?btn("■ Stop recording","stop-record","voice-primary"):
  S.voiceJob?btn("↻ Check transcription","poll-consult","voice-primary"):
