@@ -82,14 +82,15 @@ function parseSimpleLine(line){
 }
 export function invoiceFromText(text,{pages=1,wasOcr=false}={}){
  const doc=String(text||""),all=doc.split(/\r?\n/),first=all.slice(0,20);
- const seller=first.map(s=>s.trim()).find(s=>s.length>=5&&s.length<=100&&
-   !/^(address|phone|GST|bill to|invoice|tax|total|original|state|D\.L|BANK)/i.test(s))||"";
+ const seller=first.map(s=>s.trim().split(/\s{3,}/)[0].trim()).find(s=>s.length>=5&&s.length<=100&&
+   !/^(address|phone|GST|bill to|invoice|tax|total|original|state|D\.L|BANK|\d{4,})/i.test(s))||"";
  const inv=doc.match(/\b(?:Invoice|Bill)\s*(?:No\.?|Number|#)\s*[:.-]?\s*([A-Z0-9][\w/-]{2,35})/i);
  const rawDate=doc.match(/\b(?:invoice|bill)\s*(?:no\.?|number|#)?.{0,100}\bdate\s*[:.]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i)||
    doc.match(/\bDate\s*[:.]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i);
  const grand=doc.match(/\bGrand\s+Total\s*[\s:]*\r?\n\s*([\d,]+(?:\.\d{1,2})?)/i)||
    doc.match(/\bGrand\s+Total\s*[:₹ ]+([\d,]+(?:\.\d{1,2})?)/i)||
-   doc.match(/\bAmount\s+(?:Payable|Due)\s*[:₹ ]+([\d,]+(?:\.\d{1,2})?)/i);
+   doc.match(/\bAmount\s+(?:Payable|Due)\s*[:₹ ]+([\d,]+(?:\.\d{1,2})?)/i)||
+   doc.match(/^Amount in words[^\n]*?\s{3,}([\d,]+\.\d{2})\s*$/im);
  const lines=[],seen=new Set(),warnings=[...emptyWarnings];
  for(const line of all){
   const row=parseFixedRow(line)||parseSimpleLine(line);
@@ -129,7 +130,7 @@ export async function readPdfInvoice(bytes){
   for(let i=1;i<=pages;i++){
    const content=nativePages[i-1]||"";
    // Some suppliers overlay a text header on a scanned table; require meaningful line data.
-   if(content.length>150&&/^\s*\d{1,3}\s*[.)]\s+\S/m.test(content)){sections.push(content);continue;}
+   if(content.length>150&&invoiceFromText(content).lines.length>0){sections.push(content);continue;}
    const base=join(dir,"page-"+i);
    await exec("pdftoppm",["-f",String(i),"-l",String(i),"-singlefile","-gray","-scale-to","2100","-png",filepath,base],30000);
    const pageText=await exec("tesseract",[base+".png","stdout","-l","eng","--psm","6","-c","preserve_interword_spaces=1"],35000);
