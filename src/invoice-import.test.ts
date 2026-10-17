@@ -79,9 +79,9 @@ describe("Local OCR layout extraction",()=>{
    "                     EXAMPLE MEDICAL AGENCIES                                    Original for Buyer",
    "Invoice No. : A001404 Date : 07-10-2026",
    "Sn.    Item Name                              Pack    MFR      HSN     MRP       Batch     Exp      Qty     Qty    Rate    Dis   Amt   GST   Tax   Net",
-   "1.     PARACETAMOL(WIN)ROUND                1*1000  MAKERS     3004    1019.20   3A6040D   5/29     0.50    0      410.0000  0.0   205.00  5%    10.26 215.26",
-   "17.    BECOVIT FORTE TAB STRIP             1*10    SKYMAP     21069099 70.50     SAP26124110/27 12.00  0   8.0000    0.0    96.00 5%    4.80  100.80",
-   "29.    ACCUTEST HCG(PREG)CARD              1       CADILA     30029020 60.00     NP25006 6/27    5.00  0   10.0000   0.0    50.00 5%    2.50   52.50",
+   "1.    PARACETAMOL(WIN)ROUND              1*1000   MAKERS         3004   1019.20   3A6040D   5/29       0.50   0    410.0000   0.0   205.00     5%    10.26   215.26",
+   "17.   BECOVIT FORTE TAB STRIP            1*10     SKYMAP     21069099     70.50   SAP26124110/27      12.00   0      8.0000   0.0    96.00     5%     4.80   100.80",
+   "29. ACCUTEST HCG(PREG)CARD               1        CADILA     30029020     60.00   NP25006 6/27         5.00   0    10.0000   0.0     50.00     5%     2.50      52.50",
    "Amount in words : Rupees Three Thousand Two Hundred Ninety Four only                                   3294.00"
   ].join("\n");
   const parsed=invoiceFromText(pdfText,{pages:4});
