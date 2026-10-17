@@ -1,6 +1,7 @@
 FROM oven/bun:1
 WORKDIR /app
 COPY package.json ./
+RUN bun install --production
 COPY src ./src
 RUN bun test src/clinic-system.test.ts src/patient-registration.test.ts src/unified-ui.test.ts src/clinic-medicines.test.ts
 RUN bun build ./src/unified-views.js ./src/unified-consult.js ./src/unified.js --target browser --outdir /tmp/durva-ui-check
