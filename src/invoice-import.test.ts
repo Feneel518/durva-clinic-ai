@@ -1,5 +1,5 @@
 import {describe,test,expect} from "bun:test";
-import {unitsFor,normalizeInvoice} from "./invoice-import";
+import {unitsFor,normalizeInvoice,tabularInvoiceRows,sarvamInvoiceSchema} from "./invoice-import";
 describe("Medicine invoice stock conversion",()=>{
  test("half box of 1000 is 500 tablets",()=>{
   expect(unitsFor({pack:"1*1000",quantityPacks:0.5,quantityLoose:0})).toEqual({per:1000,qty:500,exact:true});
@@ -50,5 +50,29 @@ describe("Invoice draft preparation",()=>{
   expect(data.lines[25].quantityUnits).toBe(120);
   expect(data.lines[28].quantityUnits).toBe(5);
   expect(data.lines.every(x=>x.batch==="")).toBe(true);
+ });
+});
+describe("Invoice extraction compatibility",()=>{
+ test("generic spreadsheet with Item Name and Qty columns",()=>{
+  const result=tabularInvoiceRows([
+   ["MEHTA MEDICAL AGENCIES"],["Item Name","Pack","Batch","Exp","Qty","Rate","Amount"],
+   ["PARACETAMOL ROUND","1*1000","A123","05/29",0.50,410,205],
+   ["SPASMODIC MF STRIP","1*10","B234","04/29",20,7,140],
+   ["Grand Total","","","",0,0,345]
+  ]);
+  expect(result.lines).toHaveLength(2);
+  expect(result.lines[0].name).toBe("PARACETAMOL ROUND");
+  expect(result.lines[0].quantityPacks).toBe(.5);
+  expect(normalizeInvoice(result).lines[0].quantityUnits).toBe(500);
+  expect(normalizeInvoice(result).lines[1].quantityUnits).toBe(200);
+ });
+ test("unstructured spreadsheets are never silently imported",()=>{
+  expect(tabularInvoiceRows([["Hello"],["unknown","6"]])).toBeNull();
+ });
+ test("document extraction schema contains each invoice line and its necessary stock columns",()=>{
+  const schema=sarvamInvoiceSchema();
+  expect(schema.properties.lines.type).toBe("array");
+  expect(schema.properties.lines.items.properties.quantityPacks.type).toBe("number");
+  expect(schema.properties.lines.items.properties.expiry.type).toBe("string");
  });
 });
