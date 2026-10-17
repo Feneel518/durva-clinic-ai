@@ -1,0 +1,24 @@
+name: Verify medicine invoice importer
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --production
+      - name: Run clinical and invoice regression tests
+        run: bun test src/clinic-system.test.ts src/patient-registration.test.ts src/unified-ui.test.ts src/clinic-medicines.test.ts src/invoice-import.test.ts
+      - name: Validate browser JavaScript
+        run: bun build src/console.js src/console-invoice.js --target browser --outdir /tmp/durva-clinic-ui-check
+      - name: Validate Railway Docker build
+        run: docker build -t durva-invoice-check .
