@@ -4,6 +4,7 @@ import { extractVoicePatient } from "./patient-registration";
 import { ensureClinicSchema,clinicAPI } from "./clinic-system";
 import { ensureConsoleSchema,consoleApi } from "./console-api";
 import {ensureMedicineSchema,listCatalog,medicineAPI} from "./clinic-medicines";
+import {ensureInvoiceSchema,invoiceAPI} from "./invoice-import";
 import {extractSpokenOrders} from "./voice-orders";
 import { randomBytes, createHash, createHmac, createCipheriv, createDecipheriv, timingSafeEqual, randomUUID } from "node:crypto";
 const env=Bun.env;
@@ -20,6 +21,7 @@ await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_ai_jobs(visit_id uuid PRIMAR
 await ensureClinicSchema(sql);
 await ensureConsoleSchema(sql);
 await ensureMedicineSchema(sql);
+await ensureInvoiceSchema(sql);
 dbReady=true;
 }catch(e){dbError=String(e?.message||e);console.error("Database setup failed",dbError);}})();
 const names=["chiefComplaint","historyOfPresentIllness","pastHistory","examination","assessment","plan","medications","followUp","uncertainties"];
@@ -42,8 +44,8 @@ const AUDIO_TYPES={"audio/mp4":"mp4","audio/m4a":"m4a","audio/x-m4a":"m4a","audi
 async function aiRequest(path,options){const result=await fetch("https://api.openai.com/v1"+path,{...options,signal:AbortSignal.timeout(180000)});if(!result.ok)throw Error("AI provider failed with status "+result.status);return result.json();}
 async function handle(req){const url=new URL(req.url),path=url.pathname,method=req.method;
 if(path==="/api/health")return reply({status:dbReady?"ok":"initializing",databaseReady:dbReady,issue:dbError? "Database startup failed":null},dbReady?200:503);
-if(method==="GET"&&["/console","/console/","/console.css","/console-polish.css","/console-luxe.css","/console.js"].includes(path)){
- const file=path.endsWith("polish.css")?"console-polish.css":path.endsWith("luxe.css")?"console-luxe.css":path.endsWith(".css")?"console.css":path.endsWith(".js")?"console.js":"console.html";
+if(method==="GET"&&["/console","/console/","/console.css","/console-polish.css","/console-luxe.css","/console.js","/console-invoice.js"].includes(path)){
+ const file=path.endsWith("invoice.js")?"console-invoice.js":path.endsWith("polish.css")?"console-polish.css":path.endsWith("luxe.css")?"console-luxe.css":path.endsWith(".css")?"console.css":path.endsWith(".js")?"console.js":"console.html";
  const mime=file.endsWith(".css")?"text/css":file.endsWith(".js")?"text/javascript":"text/html";
  return new Response(Bun.file(new URL("./"+file,import.meta.url)),{headers:{"Content-Type":mime+"; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'"}});
 }
@@ -65,6 +67,7 @@ if(!["GET","POST","PATCH","PUT","DELETE"].includes(method))return err("Method un
 if(method!=="GET"){const o=req.headers.get("origin");if(o&&new URL(o).host!==url.host)return err("Origin rejected",403);if(req.headers.get("x-clinic-request")!=="1")return err("Request header missing",403);}
 if(path==="/api/login"&&method==="POST"){const ip=req.headers.get("cf-connecting-ip")||"default",t=Date.now();const z=tries.get(ip)||{n:0,t};if(t-z.t>900000){z.n=0;z.t=t;}z.n++;tries.set(ip,z);if(z.n>15)return err("Too many login attempts",429);const b=await req.json();const rows=await sql.unsafe("SELECT * FROM clinic_users WHERE email=$1",[clean(b.email,160).toLowerCase()]);const u=rows[0];if(!u||!await Bun.password.verify(String(b.password||""),u.password_hash))return err("Invalid credentials",401);const tok=randomBytes(32).toString("base64url");await sql.unsafe("INSERT INTO clinic_sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '12 hours')",[hash(tok),u.id]);return reply({ok:true},200,{"Set-Cookie":cookie(tok,43200)});}
 const u=await userFrom(req);if(!u)return err("Sign in required",401);
+if(path.startsWith("/api/clinic/invoices"))return invoiceAPI({sql,req,url,user:u,pack,unpack,reply,err,env});
 if(path.startsWith("/api/clinic/medicines"))return medicineAPI({sql,req,url,user:u,pack,unpack,reply,err});
 if(path.startsWith("/api/opd/"))return clinicAPI({sql,req,url,user:u,pack,unpack,reply,err});
 if(path==="/api/console/favorites")return consoleApi({sql,req,user:u,pack,unpack,reply,err});

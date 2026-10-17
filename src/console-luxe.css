@@ -201,3 +201,51 @@ button:focus-visible,input:focus-visible,a:focus-visible,textarea:focus-visible,
   .stats{gap:8px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* Supplier invoice review: tactile but strictly functional */
+.import-overlay{position:fixed;inset:0;background:#211922bf;z-index:220;display:grid;place-items:center;padding:16px;backdrop-filter:blur(3px)}
+.import-dialog{width:min(100%,1020px);max-height:94vh;overflow:auto;background:#fffdfb;border:1px solid #e7ddd9;box-shadow:0 26px 80px #1b101a30;border-radius:14px;padding:27px}
+.import-head{display:flex;justify-content:space-between;align-items:start;gap:18px;margin-bottom:22px}
+.import-head h2{font:400 clamp(29px,3vw,40px)/1.1 var(--font-display);margin:2px 0 7px}
+.import-head p{font-size:12px;color:#7e7476;line-height:1.6;margin:0}
+.import-drop{padding:30px 20px;text-align:center;background:#faf6f5;border:1px dashed #d8cad0;border-radius:11px;margin:10px 0 16px}
+.import-drop label{display:block;font-size:15px;font-weight:700;margin:5px 0 11px}
+.import-drop input{display:block;width:100%;max-width:380px;margin:auto;font-size:12px}
+.import-drop p{font-size:11px;color:#84797c;margin:12px 0 0}
+.import-symbol{font-size:28px;color:var(--garnet);font-weight:400}
+.import-consent{display:flex;gap:11px;align-items:start;font-size:12px;color:#5f5659;line-height:1.6}
+.import-consent input,.import-checks input{accent-color:var(--garnet);margin-top:3px}
+.import-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px;border-top:1px solid var(--edge);padding-top:17px;flex-wrap:wrap}
+.import-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.import-summary>div{background:#faf8f5;border:1px solid #eae3df;padding:13px;border-radius:9px;display:flex;flex-direction:column;gap:5px}
+.import-summary small{font-size:10px;color:#81777a}
+.import-summary strong{font-size:12px;overflow-wrap:anywhere}
+.import-batch-tools{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#81777a;font-size:11px;margin:20px 0 10px}
+.import-lines{border:1px solid #eae3df;border-radius:9px;overflow:hidden}
+.import-line{border-bottom:1px solid #eae3df}
+.import-line:last-child{border:0}
+.import-line summary{display:flex;align-items:center;gap:10px;padding:12px;background:#fffdfb;cursor:pointer;list-style:none}
+.import-line summary::-webkit-details-marker{display:none}
+.import-line[open] summary{background:#fbf7f5;border-bottom:1px solid #eae3df}
+.import-num{display:grid;place-items:center;width:33px;height:33px;flex:none;border:1px solid #e9dce2;border-radius:8px;color:var(--garnet);font-size:11px}
+.import-product{flex:1;min-width:0}
+.import-product strong{display:block;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.import-product small{display:block;color:#81787b;font-size:10px;margin-top:4px}
+.import-line-content{padding:16px;background:white}
+.import-edit-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}
+.import-field{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#625b5e;font-weight:650}
+.import-field input{min-width:0;width:100%;background:#fff;border:1px solid #e4deda;border-radius:8px;padding:9px;font:400 12px var(--font-ui);min-height:39px}
+.import-field input:focus{border-color:var(--garnet);outline:2px solid #77324b21}
+.import-line-content .caption{margin:12px 0}
+.import-issues{font-size:11px;color:#95642f;background:#fff8ec;border-radius:7px;padding:9px 10px}
+.import-checks{display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-top:1px solid var(--edge);margin-top:13px;padding-top:12px}
+.import-checks label{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:650}
+#durvaInvoiceError{font-size:12px;color:#a43849;font-weight:650;margin:12px 0 0}
+@media(max-width:700px){
+ .import-dialog{padding:17px}
+ .import-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .import-edit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .import-line summary{flex-wrap:wrap}
+ .import-actions .btn{flex:1}
+}
+@media(max-width:420px){.import-edit-grid{grid-template-columns:1fr}}
