@@ -6,5 +6,8 @@
   "scripts": {
     "start": "bun run src/main.ts"
   },
-  "description": "Durva Clinic multilingual AI consultation notes backed by Railway Postgres and Sarvam"
+  "description": "Durva Clinic multilingual AI consultation notes backed by Railway Postgres and Sarvam",
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  }
 }
