@@ -4,6 +4,7 @@ import { extractVoicePatient } from "./patient-registration";
 import { ensureClinicSchema,clinicAPI } from "./clinic-system";
 import { ensureConsoleSchema,consoleApi } from "./console-api";
 import {ensureMedicineSchema,listCatalog,medicineAPI} from "./clinic-medicines";
+import {ensureInvoiceSchema,invoiceAPI} from "./invoice-import";
 import {extractSpokenOrders} from "./voice-orders";
 import { randomBytes, createHash, createHmac, createCipheriv, createDecipheriv, timingSafeEqual, randomUUID } from "node:crypto";
 const env=Bun.env;
@@ -20,6 +21,7 @@ await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_ai_jobs(visit_id uuid PRIMAR
 await ensureClinicSchema(sql);
 await ensureConsoleSchema(sql);
 await ensureMedicineSchema(sql);
+await ensureInvoiceSchema(sql);
 dbReady=true;
 }catch(e){dbError=String(e?.message||e);console.error("Database setup failed",dbError);}})();
 const names=["chiefComplaint","historyOfPresentIllness","pastHistory","examination","assessment","plan","medications","followUp","uncertainties"];
@@ -65,6 +67,7 @@ if(!["GET","POST","PATCH","PUT","DELETE"].includes(method))return err("Method un
 if(method!=="GET"){const o=req.headers.get("origin");if(o&&new URL(o).host!==url.host)return err("Origin rejected",403);if(req.headers.get("x-clinic-request")!=="1")return err("Request header missing",403);}
 if(path==="/api/login"&&method==="POST"){const ip=req.headers.get("cf-connecting-ip")||"default",t=Date.now();const z=tries.get(ip)||{n:0,t};if(t-z.t>900000){z.n=0;z.t=t;}z.n++;tries.set(ip,z);if(z.n>15)return err("Too many login attempts",429);const b=await req.json();const rows=await sql.unsafe("SELECT * FROM clinic_users WHERE email=$1",[clean(b.email,160).toLowerCase()]);const u=rows[0];if(!u||!await Bun.password.verify(String(b.password||""),u.password_hash))return err("Invalid credentials",401);const tok=randomBytes(32).toString("base64url");await sql.unsafe("INSERT INTO clinic_sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '12 hours')",[hash(tok),u.id]);return reply({ok:true},200,{"Set-Cookie":cookie(tok,43200)});}
 const u=await userFrom(req);if(!u)return err("Sign in required",401);
+if(path.startsWith("/api/clinic/invoices"))return invoiceAPI({sql,req,url,user:u,pack,unpack,reply,err,env});
 if(path.startsWith("/api/clinic/medicines"))return medicineAPI({sql,req,url,user:u,pack,unpack,reply,err});
 if(path.startsWith("/api/opd/"))return clinicAPI({sql,req,url,user:u,pack,unpack,reply,err});
 if(path==="/api/console/favorites")return consoleApi({sql,req,user:u,pack,unpack,reply,err});
