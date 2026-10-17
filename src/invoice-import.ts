@@ -85,6 +85,143 @@ async function extract(bytes,ext,env){
  if(!out)throw Error("Invoice extraction returned no data; try a clearer file.");
  return JSON.parse(out);
 }
+
+// Sarvam Vision Extract works with the clinic's existing SARVAM_API_KEY.
+// The provider creates a document-intelligence job, polls for terminal status,
+// and returns JSON with field-level provenance. Never update inventory here.
+export function sarvamInvoiceSchema(){
+ const word=(description)=>({type:"string",description});
+ const numeric=(description)=>({type:"number",description});
+ return {type:"object",properties:{
+  supplier:word("Invoice seller, supplier or merchant name exactly as printed"),
+  invoiceNumber:word("Invoice or bill number; empty if not printed"),
+  invoiceDate:word("Invoice date YYYY-MM-DD, or empty if unreadable"),
+  invoiceTotal:word("Grand total payable in rupees as text, or empty if unknown"),
+  expectedLineCount:numeric("Highest item serial number in invoice; count if no serial numbers"),
+  warnings:{type:"array",description:"Uncertain rows, faint text, missing pages or ambiguous totals",items:{type:"string",description:"Possible extraction issue"}},
+  lines:{type:"array",description:"Every distinct purchase item across all pages, no repeated page totals",items:{
+   type:"object",properties:{
+    lineNo:numeric("Printed item serial number, beginning at 1"),
+    name:word("Printed item or trade name verbatim. Never guess generic composition"),
+    strength:word("Explicit medicine strength only; otherwise empty"),
+    form:word("Only stated dosage form: tablet, capsule, syrup, strip, card etc. Otherwise empty"),
+    route:word("Only explicitly stated route of administration. Otherwise empty"),
+    pack:word("Pack size verbatim, such as 1*1000, 1*10, or 1"),
+    manufacturer:word("Printed manufacturer abbreviation or name"),
+    batch:word("Batch number from this item row; empty if ambiguous"),
+    expiry:word("Printed expiry MM/YY if clearly readable; otherwise empty"),
+    quantityPacks:numeric("Qty(box) / packs purchased, decimals preserved e.g. 0.50"),
+    quantityLoose:numeric("Separate Qty(Pcs) or loose pieces; zero if absent"),
+    unitsPerPack:numeric("Pieces per printed pack: 1*1000=1000; 1*10=10; 1=1. Zero if unclear"),
+    purchaseRate:numeric("Printed invoice purchase rate; zero if absent"),
+    mrp:numeric("Printed MRP; zero if absent"),
+    amount:numeric("Line taxable amount excluding GST, or zero if absent"),
+    confidence:word("high, medium, or low, based on accurate transcription and complete columns")
+   }}}
+ }};
+}
+async function extractViaSarvamPdf(bytes,env){
+ const schema=sarvamInvoiceSchema();
+ const form=new FormData();
+ form.append("file",new Blob([bytes],{type:"application/pdf"}),"invoice.pdf");
+ form.append("schema",JSON.stringify(schema));
+ form.append("output_format","json");
+ const headers={"api-subscription-key":env.SARVAM_API_KEY};
+ const send=await fetch("https://api.sarvam.ai/doc-ai/v1/job/extract",{
+  method:"POST",headers,body:form,signal:AbortSignal.timeout(30000)});
+ if(!send.ok){
+  if([402,403].includes(send.status))throw Error("Sarvam Document AI access or credits are unavailable. Configure its document access or an OpenAI API key.");
+  throw Error("Sarvam document extraction could not start (HTTP "+send.status+").");
+ }
+ const job=await send.json();
+ if(!/^[\w-]{20,90}$/.test(String(job.job_id||"")))throw Error("Sarvam did not return a valid invoice job reference.");
+ const id=encodeURIComponent(job.job_id);
+ let state="";
+ for(let i=0;i<42;i++){
+  await Bun.sleep(i===0?1500:2500);
+  const poll=await fetch("https://api.sarvam.ai/doc-ai/v1/job/"+id+"/status",{
+   headers,signal:AbortSignal.timeout(12000)});
+  if(!poll.ok)throw Error("Could not check invoice extraction status.");
+  const status=await poll.json();state=String(status.status||"").toLowerCase();
+  if(["completed","partially_completed","failed","rejected"].includes(state))break;
+ }
+ if(!["completed","partially_completed"].includes(state))
+  throw Error(state==="failed"||state==="rejected"?"Invoice extraction failed. Try a clearer PDF.":"Invoice extraction timed out; try a smaller PDF.");
+ const result=await fetch("https://api.sarvam.ai/doc-ai/v1/job/"+id+"/results",{
+  headers,signal:AbortSignal.timeout(20000)});
+ if(!result.ok)throw Error("Could not download extracted invoice data.");
+ const json=await result.json();
+ if(!json.result||typeof json.result!=="object")throw Error("The document service returned no recognizable invoice data.");
+ const parsed=json.result;
+ if(state==="partially_completed"){
+  parsed.warnings=Array.isArray(parsed.warnings)?parsed.warnings:[];
+  parsed.warnings.unshift("Some invoice pages could not be processed. Verify all line items before approval.");
+ }
+ return parsed;
+}
+export function tabularInvoiceRows(rows){
+ const entries=rows.filter(r=>Array.isArray(r)&&r.some(x=>String(x??"").trim()));
+ const words=v=>String(v??"").trim().toLowerCase().replace(/[^a-z0-9]+/g," ");
+ const maps={
+  name:["item name","product name","medicine name","description","particulars","item","product","medicine","drug"],
+  pack:["pack size","packing","pack","unit pack","size"],
+  batch:["batch no","batch number","batch"],
+  expiry:["expiry date","expiry","exp date","exp"],
+  quantityPacks:["qty box","qty packs","boxes","quantity packs","pack qty","qty","quantity"],
+  quantityLoose:["qty pcs","loose pcs","loose","pieces"],
+  purchaseRate:["purchase rate","unit price","purchase price","rate"],
+  amount:["taxable amount","net amount","line amount","amount"],
+  mrp:["mrp"],manufacturer:["manufacturer","mfr","company"],
+  strength:["strength","dosage"],form:["form","formulation"],
+  route:["route"],unitsPerPack:["units per pack","pack units"]
+ };
+ let head=null,idx=-1;
+ for(let i=0;i<Math.min(entries.length,45);i++){
+  const lower=entries[i].map(words),fields={};
+  for(const [k,alts] of Object.entries(maps)){
+   const n=lower.findIndex(c=>alts.some(a=>c===a||c.startsWith(a+" ")));
+   if(n>=0)fields[k]=n;
+  }
+  if(fields.name!==undefined&&fields.quantityPacks!==undefined){head=fields;idx=i;break;}
+ }
+ if(!head)return null;
+ const get=(r,k)=>head[k]===undefined?"":String(r[head[k]]??"").trim();
+ const numCell=(r,k)=>{const v=get(r,k).replace(/[₹,%\s]/g,"");const n=Number(v);return Number.isFinite(n)&&n>0?n:0;};
+ const lines=[];
+ for(const r of entries.slice(idx+1,idx+210)){
+  const name=get(r,"name");if(!name||/(^grand total$|^subtotal$|^total$|balance brought forward)/i.test(name))continue;
+  const packs=numCell(r,"quantityPacks"),loose=numCell(r,"quantityLoose");
+  if(!packs&&!loose)continue;
+  const pack=get(r,"pack");
+  lines.push({lineNo:lines.length+1,name,pack,manufacturer:get(r,"manufacturer"),
+   strength:get(r,"strength"),form:get(r,"form"),route:get(r,"route"),batch:get(r,"batch"),expiry:get(r,"expiry"),
+   quantityPacks:packs,quantityLoose:loose,unitsPerPack:numCell(r,"unitsPerPack"),
+   purchaseRate:numCell(r,"purchaseRate"),mrp:numCell(r,"mrp"),amount:numCell(r,"amount"),confidence:"medium"});
+  if(lines.length>=180)break;
+ }
+ if(!lines.length)return null;
+ const first=entries.slice(0,idx).flatMap(r=>r.map(x=>String(x??"")));
+ const invoiceLabel=first.join(" ").match(/(?:invoice|bill)\s*(?:number|no\.?|#)\s*[:#]?\s*([A-Z0-9/-]+)/i);
+ return {supplier:"",invoiceNumber:invoiceLabel?.[1]||"",invoiceDate:"",invoiceTotal:"",
+  expectedLineCount:lines.length,
+  warnings:["Spreadsheet import: verify supplier, invoice number, batch and quantities. Unmapped fields are left blank."],lines};
+}
+async function extractTabularWithoutAI(bytes,ext){
+ let rows;
+ if(ext==="csv")rows=csvRows(new TextDecoder().decode(bytes));
+ else{
+  const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(bytes);
+  rows=workbook.worksheets.flatMap(w=>{
+   const output=[];w.eachRow({includeEmpty:false},r=>output.push(r.values.slice(1,35).map(x=>
+    x==null?"":typeof x==="object"?x.text??x.result??"":String(x))));
+   return output.slice(0,300);
+  });
+ }
+ const parsed=tabularInvoiceRows(rows);
+ if(!parsed)throw Error("Could not identify medicine and quantity columns. Export Excel with a heading row such as Item Name and Qty, or configure an AI extraction key.");
+ return parsed;
+}
+
 export async function ensureInvoiceSchema(sql){
  await sql.unsafe("CREATE TABLE IF NOT EXISTS clinic_invoice_imports(id uuid PRIMARY KEY,owner_id uuid NOT NULL REFERENCES clinic_users(id),file_hash text NOT NULL,supplier_key text NOT NULL DEFAULT '',invoice_number text NOT NULL DEFAULT '',status text NOT NULL DEFAULT 'draft',data_enc text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),approved_at timestamptz,UNIQUE(owner_id,file_hash))");
  await sql.unsafe("CREATE INDEX IF NOT EXISTS invoice_import_owner_idx ON clinic_invoice_imports(owner_id,created_at)");
@@ -93,7 +230,7 @@ export async function ensureInvoiceSchema(sql){
 export async function invoiceAPI({sql,req,url,user,pack,unpack,reply,err,env}){
  const path=url.pathname,method=req.method;
  if(path==="/api/clinic/invoices/preview"&&method==="POST"){
-  if(!env.OPENAI_API_KEY)return err("Invoice extraction requires OPENAI_API_KEY to be configured.",503);
+  if(!env.OPENAI_API_KEY&&!env.SARVAM_API_KEY&&req.headers.get("x-invoice-filename")?.endsWith(".pdf"))return err("PDF extraction requires SARVAM_API_KEY or OPENAI_API_KEY.",503);
   if(req.headers.get("x-invoice-ai-consent")!=="confirmed")return err("Confirm external AI processing of supplier invoice details.",403);
   const name=str(req.headers.get("x-invoice-filename"),120),ext=name.split(".").at(-1)?.toLowerCase();
   if(!["pdf","xlsx","csv"].includes(ext||""))return err("Upload PDF, XLSX or CSV. Convert old .xls to .xlsx first.",415);
@@ -105,7 +242,7 @@ export async function invoiceAPI({sql,req,url,user,pack,unpack,reply,err,env}){
   const hash=createHash("sha256").update(bytes).digest("hex");
   const prev=await sql.unsafe("SELECT status FROM clinic_invoice_imports WHERE owner_id=$1 AND file_hash=$2",[user.id,hash]);
   if(prev.length)return err("This invoice file was already uploaded ("+prev[0].status+").",409);
-  let raw;try{raw=await extract(bytes,ext,env);}catch(e){return err(str(e.message||"Invoice extraction failed",240),502);}
+  let raw;try{raw=ext==="pdf"&&env.SARVAM_API_KEY?await extractViaSarvamPdf(bytes,env):env.OPENAI_API_KEY?await extract(bytes,ext,env):ext!=="pdf"?await extractTabularWithoutAI(bytes,ext):null;if(!raw)throw Error("No PDF extraction service is configured.");}catch(e){return err(str(e.message||"Invoice extraction failed",240),502);}
   const data=normalizeInvoice(raw,await listCatalog(sql,unpack,user.id));
   if(!data.lines.length)return err("No invoice lines identified.",422);
   if(data.expectedLineCount&&data.expectedLineCount!==data.extractedCount)data.warnings.unshift("Found "+data.extractedCount+" of "+data.expectedLineCount+" printed items; verify all pages before approval.");
