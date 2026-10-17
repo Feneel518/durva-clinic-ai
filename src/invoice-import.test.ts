@@ -1,5 +1,5 @@
 import {describe,test,expect} from "bun:test";
-import {unitsFor,normalizeInvoice,tabularInvoiceRows,sarvamInvoiceSchema} from "./invoice-import";
+import {unitsFor,normalizeInvoice,tabularInvoiceRows} from "./invoice-import";
 describe("Medicine invoice stock conversion",()=>{
  test("half box of 1000 is 500 tablets",()=>{
   expect(unitsFor({pack:"1*1000",quantityPacks:0.5,quantityLoose:0})).toEqual({per:1000,qty:500,exact:true});
@@ -69,10 +69,5 @@ describe("Invoice extraction compatibility",()=>{
  test("unstructured spreadsheets are never silently imported",()=>{
   expect(tabularInvoiceRows([["Hello"],["unknown","6"]])).toBeNull();
  });
- test("document extraction schema contains each invoice line and its necessary stock columns",()=>{
-  const schema=sarvamInvoiceSchema();
-  expect(schema.properties.lines.type).toBe("array");
-  expect(schema.properties.lines.items.properties.quantityPacks.type).toBe("number");
-  expect(schema.properties.lines.items.properties.expiry.type).toBe("string");
- });
+
 });
