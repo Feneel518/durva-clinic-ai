@@ -5,12 +5,14 @@ const E=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt
 let draft=null,busy=false;
 const root=()=>document.getElementById("durva-invoice-overlay");
 const action=(label,cmd,kind="")=>'<button type="button" class="btn '+kind+'" data-invoice-action="'+cmd+'">'+label+'</button>';
+const hdr=(label,key,val)=>'<label class="import-field"><span>'+E(label)+'</span><input data-invoice-header="'+key+'" value="'+E(val)+'"></label>';
 const fld=(label,i,key,val,type="text")=>'<label class="import-field"><span>'+E(label)+'</span><input type="'+type+'" data-invoice-row="'+i+'" data-invoice-key="'+key+'" value="'+E(val)+'"></label>';
 function dialog(){
  const el=root();if(!el)return;
  const inv=draft?.invoice;
  const inner=inv?'<div class="import-head"><div><div class="head-eyebrow">Supplier invoice</div><h2>Review medicines</h2><p>Confirm product identity, stock count, and expiry against the original before saving.</p></div>'+action("✕","close","white small")+'</div>'+
   '<div class="import-summary"><div><small>Supplier</small><strong>'+E(inv.supplier||"Unknown")+'</strong></div><div><small>Invoice</small><strong>'+E(inv.invoiceNumber||"Unknown")+'</strong></div><div><small>Extracted</small><strong>'+E(inv.extractedCount)+" / "+E(inv.expectedLineCount||"—")+'</strong></div><div><small>Total</small><strong>'+E(inv.invoiceTotal||"—")+'</strong></div></div>'+
+  '<div class="import-header-grid">'+hdr("Supplier *","supplier",inv.supplier)+hdr("Invoice number *","invoiceNumber",inv.invoiceNumber)+hdr("Invoice date","invoiceDate",inv.invoiceDate)+'</div>'+
   (inv.warnings?.length?'<div class="note warn">'+inv.warnings.map(E).join(" · ")+'</div>':"")+
   '<div class="import-batch-tools"><span>'+inv.lines.length+' items · unselected rows will be skipped</span>'+action("Back to upload","reset","white small")+'</div>'+
   '<div class="import-lines">'+inv.lines.map((x,i)=>'<details class="import-line" '+(i===0?'open':'')+'><summary><span class="import-num">'+E(x.lineNo)+'</span><span class="import-product"><strong>'+E(x.name||"Unnamed product")+'</strong><small>'+E(x.pack||"Unknown pack")+' · '+E(x.quantityUnits)+' units · '+E(x.expiry||"No expiry")+'</small></span>'+(x.existingId?'<span class="med-tag verified">Existing</span>':'<span class="med-tag">New</span>')+(x.issues?.length?'<span class="med-tag caution">'+x.issues.length+' checks</span>':"")+'</summary>'+
@@ -63,14 +65,14 @@ document.addEventListener("click",async e=>{
    if(selected.some(x=>!x.confirmed))throw Error("Mark every included item as Verified.");
    if(selected.some(x=>!x.name?.trim()||!x.strength?.trim()||!x.form?.trim()||!x.route?.trim()||!Number.isSafeInteger(Number(x.quantityUnits))||Number(x.quantityUnits)<1))throw Error("Complete names, strengths, forms, routes and whole-number stock quantities.");
    if(!confirm("Add "+selected.length+" reviewed item lines to clinic stock? This purchase cannot be automatically undone."))return;
-   const result=await call("/api/clinic/invoices/"+draft.id+"/commit",{reviewed:true,lines});
+   const result=await call("/api/clinic/invoices/"+draft.id+"/commit",{reviewed:true,lines,header:{supplier:draft.invoice.supplier,invoiceNumber:draft.invoice.invoiceNumber,invoiceDate:draft.invoice.invoiceDate}});
    root()?.remove();draft=null;alert(result.count+" medicine line(s) saved. The clinic inventory will refresh.");location.reload();
   }
  }catch(ex){error(ex.message||"Unexpected invoice error.");}
  finally{lock(false);}
 });
 document.addEventListener("input",e=>{
- const el=e.target;if(!el?.dataset||!Object.prototype.hasOwnProperty.call(el.dataset,"invoiceRow")||!draft)return;
+ const el=e.target;if(el?.dataset?.invoiceHeader&&draft){draft.invoice[el.dataset.invoiceHeader]=el.value;return;}if(!el?.dataset||!Object.prototype.hasOwnProperty.call(el.dataset,"invoiceRow")||!draft)return;
  const row=draft.invoice.lines[Number(el.dataset.invoiceRow)];if(!row)return;
  row[el.dataset.invoiceKey]=el.type==="checkbox"?el.checked:el.value;
 });
