@@ -127,8 +127,8 @@ export async function invoiceAPI({sql,req,url,user,pack,unpack,reply,err,env}){
   if(ext==="pdf"&&bytes.toString("ascii",0,5)!=="%PDF-")return err("This is not a PDF file.",415);
   if(ext==="xlsx"&&bytes.toString("ascii",0,2)!=="PK")return err("Invalid Excel file.",415);
   const hash=createHash("sha256").update(bytes).digest("hex");
-  const prev=await sql.unsafe("SELECT status FROM clinic_invoice_imports WHERE owner_id=$1 AND file_hash=$2",[user.id,hash]);
-  if(prev.length)return err("This invoice file was already uploaded ("+prev[0].status+").",409);
+  const prev=await sql.unsafe("SELECT id,status,data_enc FROM clinic_invoice_imports WHERE owner_id=$1 AND file_hash=$2",[user.id,hash]);
+  if(prev.length){if(prev[0].status==="draft")return reply({id:prev[0].id,invoice:unpack(prev[0].data_enc),resumed:true});return err("This invoice was already committed to stock.",409);}
   let raw;try{raw=ext==="pdf"?await readPdfInvoice(bytes):await extractTabularWithoutAI(bytes,ext);}catch(e){return err(str(e.message||"Local invoice extraction failed",240),422);}
   const data=normalizeInvoice(raw,await listCatalog(sql,unpack,user.id));
   if(!data.lines.length)return err("No invoice lines identified.",422);
@@ -152,6 +152,9 @@ export async function invoiceAPI({sql,req,url,user,pack,unpack,reply,err,env}){
  const body=await req.json().catch(()=>({}));
  if(body.reviewed!==true)return err("Confirm you have reviewed the original invoice.",400);
  const original=unpack(record.data_enc),source=new Map(original.lines.map(x=>[x.lineNo,x]));
+ const header=body.header||{};
+ const approvedHeader={supplier:str(header.supplier??original.supplier,160),invoiceNumber:str(header.invoiceNumber??original.invoiceNumber,80),invoiceDate:str(header.invoiceDate??original.invoiceDate,30)};
+ if(!approvedHeader.supplier||!approvedHeader.invoiceNumber)return err("Verify supplier and invoice number before posting stock receipts.",400);
  const lines=(Array.isArray(body.lines)?body.lines:[]).filter(x=>x.included);
  if(!lines.length||lines.length>180)return err("Select at least one medicine line.",400);
  const catalog=await listCatalog(sql,unpack,user.id),seen=new Set(),plan=[];
@@ -178,8 +181,8 @@ export async function invoiceAPI({sql,req,url,user,pack,unpack,reply,err,env}){
   const changed=await sql.begin(async tx=>{
    const lock=(await tx.unsafe("SELECT status FROM clinic_invoice_imports WHERE owner_id=$1 AND id=$2 FOR UPDATE",[user.id,id[1]]))[0];
    if(!lock||lock.status!=="draft")throw Error("Invoice already imported.");
-   if(record.supplier_key&&record.invoice_number){
-    const dupe=await tx.unsafe("SELECT id FROM clinic_invoice_imports WHERE owner_id=$1 AND supplier_key=$2 AND invoice_number=$3 AND status='committed' AND id<>$4 LIMIT 1",[user.id,record.supplier_key,record.invoice_number,record.id]);
+   if(approvedHeader.supplier&&approvedHeader.invoiceNumber){
+    const dupe=await tx.unsafe("SELECT id FROM clinic_invoice_imports WHERE owner_id=$1 AND supplier_key=$2 AND invoice_number=$3 AND status='committed' AND id<>$4 LIMIT 1",[user.id,key(approvedHeader.supplier),key(approvedHeader.invoiceNumber),record.id]);
     if(dupe.length)throw Error("Supplier invoice number has already been imported.");
    }
    const output=[];
@@ -198,10 +201,10 @@ export async function invoiceAPI({sql,req,url,user,pack,unpack,reply,err,env}){
      if(n>=300)throw Error("Catalog limit of 300 medicines reached.");
      uid=randomUUID();await tx.unsafe("INSERT INTO clinic_medicine_catalog(id,owner_id,data_enc) VALUES($1,$2,$3)",[uid,user.id,pack({...p.med,aliases:[],active:true})]);
     }
-    await tx.unsafe("INSERT INTO clinic_medicine_receipts(id,owner_id,import_id,catalog_id,data_enc) VALUES($1,$2,$3,$4,$5)",[randomUUID(),user.id,id[1],uid,pack({lineNo:p.lineNo,batch:p.batch,expiry:p.expiry,quantityUnits:p.qty,pack:p.pack,mrp:p.mrp,purchaseRate:p.purchaseRate,amount:p.amount,supplier:original.supplier,invoiceNumber:original.invoiceNumber,invoiceDate:original.invoiceDate})]);
+    await tx.unsafe("INSERT INTO clinic_medicine_receipts(id,owner_id,import_id,catalog_id,data_enc) VALUES($1,$2,$3,$4,$5)",[randomUUID(),user.id,id[1],uid,pack({lineNo:p.lineNo,batch:p.batch,expiry:p.expiry,quantityUnits:p.qty,pack:p.pack,mrp:p.mrp,purchaseRate:p.purchaseRate,amount:p.amount,supplier:approvedHeader.supplier,invoiceNumber:approvedHeader.invoiceNumber,invoiceDate:approvedHeader.invoiceDate})]);
     output.push({catalogId:uid,lineNo:p.lineNo,quantity:p.qty});
    }
-   await tx.unsafe("UPDATE clinic_invoice_imports SET status='committed',approved_at=now(),data_enc=$1 WHERE id=$2 AND owner_id=$3",[pack({...original,approvedLines:plan.map(p=>({lineNo:p.lineNo,name:p.med.name,strength:p.med.strength,quantityUnits:p.qty,batch:p.batch,expiry:p.expiry}))}),user.id,id[1]]);
+   await tx.unsafe("UPDATE clinic_invoice_imports SET status='committed',approved_at=now(),supplier_key=$1,invoice_number=$2,data_enc=$3 WHERE id=$4 AND owner_id=$5",[key(approvedHeader.supplier),key(approvedHeader.invoiceNumber),pack({...original,...approvedHeader,approvedLines:plan.map(p=>({lineNo:p.lineNo,name:p.med.name,strength:p.med.strength,quantityUnits:p.qty,batch:p.batch,expiry:p.expiry}))}),id[1],user.id]);
    return output;
   });
   return reply({ok:true,count:changed.length,receipts:changed});
