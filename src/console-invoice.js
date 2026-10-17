@@ -19,11 +19,11 @@ function dialog(){
   (x.issues?.length?'<p class="import-issues">'+x.issues.map(E).join(" · ")+'</p>':"")+
   '<div class="import-checks"><label><input type="checkbox" data-invoice-row="'+i+'" data-invoice-key="included" '+(x.included?"checked":"")+'> Include</label><label><input type="checkbox" data-invoice-row="'+i+'" data-invoice-key="confirmed" '+(x.confirmed?"checked":"")+'> Verified against invoice</label></div></div></details>').join("")+'</div>'+
   '<div class="import-actions">'+action("Cancel","close","white")+action("Add verified medicines","commit")+'</div>':
-  '<div class="import-head"><div><div class="head-eyebrow">Medicine inventory</div><h2>Import supplier invoice</h2><p>Works with different supplier layouts. AI extracts a draft for your review.</p></div>'+action("✕","close","white small")+'</div>'+
-  '<div class="import-drop"><div class="import-symbol">↥</div><label for="durvaInvoiceFile">Choose PDF, Excel, or CSV</label><input type="file" id="durvaInvoiceFile" accept=".pdf,.xlsx,.csv"><p>Up to 15 MB · scanned PDFs supported</p></div>'+
-  '<label class="import-consent"><input id="durvaInvoiceConsent" type="checkbox"> I agree to send the supplier invoice to an external AI service for extraction. I will check all fields before any stock changes.</label>'+
+  '<div class="import-head"><div><div class="head-eyebrow">Medicine inventory</div><h2>Import supplier invoice</h2><p>Works with different supplier layouts. Local OCR extracts a draft for your review. No invoice is sent to an AI provider.</p></div>'+action("✕","close","white small")+'</div>'+
+  '<div class="import-drop"><div class="import-symbol">↥</div><label for="durvaInvoiceFile">Choose PDF, Excel, or CSV</label><input type="file" id="durvaInvoiceFile" accept=".pdf,.xlsx,.csv"><p>Up to 15 MB · scanned PDFs supported · processed locally</p></div>'+
+  '<label class="import-consent"><input id="durvaInvoiceConsent" type="checkbox"> I will review OCR results against the original invoice before any medicine stock changes.</label>'+
   '<div class="note warn" style="margin-top:12px">Strength, route and medicine identity must be verified by the clinician. Unknown existing stock must be reconciled before receiving purchases. Legacy .xls must be exported to .xlsx.</div>'+
-  '<div class="import-actions">'+action("Cancel","close","white")+action("Extract invoice","upload")+'</div>';
+  '<div class="import-actions">'+action("Cancel","close","white")+action("Read invoice locally","upload")+'</div>';
  el.innerHTML='<section class="import-dialog" role="dialog" aria-modal="true" aria-label="Import medicine invoice">'+inner+'<p id="durvaInvoiceError" role="status"></p></section>';
 }
 function open(){
@@ -53,8 +53,8 @@ document.addEventListener("click",async e=>{
    const file=document.getElementById("durvaInvoiceFile")?.files?.[0];
    if(!file)throw Error("Select an invoice PDF, XLSX or CSV.");
    if(file.size>15*1024*1024)throw Error("Maximum file size is 15 MB.");
-   if(!document.getElementById("durvaInvoiceConsent")?.checked)throw Error("Confirm consent for AI invoice processing.");
-   draft=await call("/api/clinic/invoices/preview",file,{"X-Invoice-Filename":encodeURIComponent(file.name),"X-Invoice-AI-Consent":"confirmed"});
+   if(!document.getElementById("durvaInvoiceConsent")?.checked)throw Error("Confirm that you will review the extracted invoice before saving.");
+   draft=await call("/api/clinic/invoices/preview",file,{"X-Invoice-Filename":encodeURIComponent(file.name),"X-Invoice-Review":"confirmed"});
    dialog();
   }
   if(cmd==="commit"){
