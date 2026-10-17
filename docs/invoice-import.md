@@ -11,9 +11,9 @@ The importer is flexible across invoice column layouts; it cannot guarantee ever
 
 ## Configuration
 
-Set OPENAI_API_KEY in the application service's Railway Variables. It is a separate API credential, not your ChatGPT subscription. OPENAI_INVOICE_MODEL is optional and defaults to gpt-4.1-mini.
+PDF processing prefers the existing SARVAM_API_KEY using Sarvam Document AI (PDF scans or image-based invoices). An optional OPENAI_API_KEY enables a second PDF option and AI-assisted XLSX/CSV extraction; without it, spreadsheet import uses recognized column headings such as Item Name and Qty. Document AI entitlement and available credits must be verified. The API credentials are server-side and never embedded in the browser.
 
-Supplier invoice files are submitted to the OpenAI Responses API with store:false after a specific consent checkbox. File bytes are not stored in Durva's database; extracted drafts are encrypted. Review third-party data processing and retention requirements before deploying.
+Supplier PDF files may be submitted to Sarvam Document AI (or optionally OpenAI Responses with store:false) after an explicit consent checkbox. Spreadsheet files use local heading-based extraction when OPENAI_API_KEY is absent. File bytes are not stored in Durva's database; extracted drafts are encrypted. Review third-party data processing and retention requirements before deploying.
 
 ## Workflow
 
@@ -29,6 +29,6 @@ Supplier invoice files are submitted to the OpenAI Responses API with store:fals
 
 ## Sample acceptance
 
-The example Marg ERP invoice is four pages with 29 item lines and fractional boxes (0.5 x 1000) and standalone five-unit test cards. Automated tests cover fractional packages, strips, single-unit packs, no inferred strength/route and 29-row data preservation. A live extraction test against the example PDF still requires an API key and a dedicated staging database.
+The example Marg ERP invoice is four pages with 29 item lines and fractional boxes (0.5 x 1000) and standalone five-unit test cards. Automated tests cover fractional packages, strips, single-unit packs, no inferred strength/route and 29-row data preservation. An authenticated end-to-end test against the example PDF is still needed; the existing Sarvam key may require Document AI entitlement and credits.
 
 Do not merge/deploy to the live Durva clinic until real invoice extraction, authentication/isolation and the end-to-end browser workflow have been tested in staging.
