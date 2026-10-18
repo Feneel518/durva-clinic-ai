@@ -1,5 +1,5 @@
 import {describe,test,expect} from "bun:test";
-import {unitsFor,normalizeInvoice,tabularInvoiceRows,sarvamInvoiceSchema} from "./invoice-import";
+import {unitsFor,normalizeInvoice,tabularInvoiceRows} from "./invoice-import";
 describe("Medicine invoice stock conversion",()=>{
  test("half box of 1000 is 500 tablets",()=>{
   expect(unitsFor({pack:"1*1000",quantityPacks:0.5,quantityLoose:0})).toEqual({per:1000,qty:500,exact:true});
@@ -69,10 +69,37 @@ describe("Invoice extraction compatibility",()=>{
  test("unstructured spreadsheets are never silently imported",()=>{
   expect(tabularInvoiceRows([["Hello"],["unknown","6"]])).toBeNull();
  });
- test("document extraction schema contains each invoice line and its necessary stock columns",()=>{
-  const schema=sarvamInvoiceSchema();
-  expect(schema.properties.lines.type).toBe("array");
-  expect(schema.properties.lines.items.properties.quantityPacks.type).toBe("number");
-  expect(schema.properties.lines.items.properties.expiry.type).toBe("string");
+
+});
+
+describe("Local OCR layout extraction",()=>{
+ test("parses GST purchase table with fractional boxes and line totals",async()=>{
+  const {invoiceFromText}=await import("./invoice-ocr");
+  const pdfText=[
+   "                     EXAMPLE MEDICAL AGENCIES                                    Original for Buyer",
+   "Invoice No. : A001404 Date : 07-10-2026",
+   "Sn.    Item Name                              Pack    MFR      HSN     MRP       Batch     Exp      Qty     Qty    Rate    Dis   Amt   GST   Tax   Net",
+   "1.    PARACETAMOL(WIN)ROUND              1*1000   MAKERS         3004   1019.20   3A6040D   5/29       0.50   0    410.0000   0.0   205.00     5%    10.26   215.26",
+   "17.   BECOVIT FORTE TAB STRIP            1*10     SKYMAP     21069099     70.50   SAP26124110/27      12.00   0      8.0000   0.0    96.00     5%     4.80   100.80",
+   "29. ACCUTEST HCG(PREG)CARD               1        CADILA     30029020     60.00   NP25006 6/27         5.00   0    10.0000   0.0     50.00     5%     2.50      52.50",
+   "Amount in words : Rupees Three Thousand Two Hundred Ninety Four only                                   3294.00"
+  ].join("\n");
+  const parsed=invoiceFromText(pdfText,{pages:4});
+  expect(parsed.supplier).toBe("EXAMPLE MEDICAL AGENCIES");
+  expect(parsed.invoiceNumber).toBe("A001404");
+  expect(parsed.invoiceDate).toBe("2026-10-07");
+  expect(parsed.invoiceTotal).toBe("3294.00");
+  expect(parsed.expectedLineCount).toBe(29);
+  expect(parsed.lines).toHaveLength(3);
+  expect(parsed.lines[0].quantityPacks).toBe(.5);
+  expect(parsed.lines[0].pack).toBe("1*1000");
+  expect(parsed.lines[1].expiry).toBe("10/27");
+  expect(parsed.lines[2].expiry).toBe("6/27");
+  expect(parsed.warnings.join(" ")).toContain("29");
+ });
+ test("refuses to create medicines from unrelated summary lines",async()=>{
+  const {invoiceFromText}=await import("./invoice-ocr");
+  const p=invoiceFromText("GRAND TOTAL 500.00\nGST 5% 25.00\nBank A/C no 12345");
+  expect(p.lines).toHaveLength(0);
  });
 });
