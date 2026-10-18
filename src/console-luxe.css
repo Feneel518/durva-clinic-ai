@@ -249,3 +249,6 @@ button:focus-visible,input:focus-visible,a:focus-visible,textarea:focus-visible,
  .import-actions .btn{flex:1}
 }
 @media(max-width:420px){.import-edit-grid{grid-template-columns:1fr}}
+
+.import-header-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin:10px 0 18px;border:1px solid #ede5e1;border-radius:9px;background:#fbf8f6;padding:13px}
+@media(max-width:700px){.import-header-grid{grid-template-columns:1fr}}
