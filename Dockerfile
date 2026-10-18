@@ -1,4 +1,6 @@
 FROM oven/bun:1
+# Local-only document extraction; no third-party OCR credentials or network calls.
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json ./
 RUN bun install --production
