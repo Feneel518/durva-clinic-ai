@@ -20,5 +20,10 @@ jobs:
         run: bun test src/clinic-system.test.ts src/patient-registration.test.ts src/unified-ui.test.ts src/clinic-medicines.test.ts src/invoice-import.test.ts
       - name: Validate browser JavaScript
         run: bun build src/console.js src/console-invoice.js --target browser --outdir /tmp/durva-clinic-ui-check
-      - name: Validate Railway Docker build
-        run: docker build -t durva-invoice-check .
+      - name: Check OCR binaries available in Docker image
+        run: |
+          docker build -t durva-invoice-check .
+          docker run --rm --entrypoint tesseract durva-invoice-check --version
+          docker run --rm --entrypoint pdftotext durva-invoice-check -v
+      - name: Docker image verified
+        run: echo 'Build and local OCR binaries checked'
